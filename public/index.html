@@ -3,26 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Game</title>
+    <title>Multiplayer Game - Home</title>
+    <link rel="stylesheet" href="/styles/styles.css">
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-
-        socket.on('playerJoined', (playerName) => {
-            const message = document.createElement('p');
-            message.textContent = `${playerName} joined the game!`;
-            document.getElementById('messages').appendChild(message);
-        });
-
-        function joinGame() {
-            const name = prompt('Enter your name:');
-            socket.emit('join', name);
-        }
-    </script>
 </head>
 <body>
-<h1>Welcome to the Multiplayer Game</h1>
-<button onclick="joinGame()">Join Game</button>
-<div id="messages"></div>
+<div id="container">
+    <h1>Multiplayer Game</h1>
+    <div id="menuButtons">
+        <button id="createGameBtn">Create Game</button>
+        <button id="joinGameBtn">Join Game</button>
+    </div>
+
+    <!-- Create Game Dialog -->
+    <div id="createGameDialog" class="dialog" style="display: none;">
+        <h2>Create Game</h2>
+        <form id="createGameForm">
+            <label for="createNameInput">Your Name:</label>
+            <input type="text" id="createNameInput" required>
+            <label for="gameNameInput">Game Name:</label>
+            <input type="text" id="gameNameInput" required>
+            <button type="submit">Create</button>
+        </form>
+        <button id="cancelCreate">Cancel</button>
+        <p id="createErrorMsg" class="error"></p>
+    </div>
+
+    <!-- Join Game Dialog -->
+    <div id="joinGameDialog" class="dialog" style="display: none;">
+        <h2>Join Game</h2>
+        <form id="joinGameForm">
+            <label for="joinRoomCode">Room Code:</label>
+            <input type="text" id="joinRoomCode" required>
+            <label for="joinNameInput">Your Name:</label>
+            <input type="text" id="joinNameInput" required>
+            <button type="submit">Join</button>
+        </form>
+        <button id="cancelJoin">Cancel</button>
+        <p id="joinErrorMsg" class="error"></p>
+    </div>
+</div>
+<script src="/js/landing.js"></script>
 </body>
 </html>

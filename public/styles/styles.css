@@ -1,0 +1,87 @@
+/* public/style/style.css */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #4a90e2, #50c9c3);
+    color: #fff;
+}
+
+#container {
+    max-width: 600px;
+    margin: 50px auto;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    text-align: center;
+}
+
+#menuButtons {
+    margin: 20px 0;
+}
+
+#menuButtons button {
+    padding: 10px 20px;
+    margin: 0 10px;
+    font-size: 1.1em;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #fff;
+    color: #333;
+    transition: background 0.3s;
+}
+
+#menuButtons button:hover {
+    background: #ddd;
+}
+
+.dialog {
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.dialog h2 {
+    margin-top: 0;
+}
+
+.dialog form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dialog label {
+    font-weight: bold;
+}
+
+.dialog input[type="text"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.dialog button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #4a90e2;
+    color: #fff;
+    margin-top: 10px;
+}
+
+.dialog button:hover {
+    background: #3a78c2;
+}
+
+.error {
+    color: #ff6b6b;
+    font-weight: bold;
+    margin-top: 10px;
+}
