@@ -7,6 +7,7 @@ body {
     font-family: Arial, sans-serif;
 }
 
+/* Container for the game content */
 #gameContainer {
     display: flex;
     flex-direction: column;
@@ -15,6 +16,7 @@ body {
     height: 100vh;
 }
 
+/* Game board styling */
 #board {
     position: relative;
     width: 80vw;
@@ -24,6 +26,7 @@ body {
     margin-bottom: 20px;
 }
 
+/* Styling for player avatars */
 .avatar {
     position: absolute;
     width: 40px;
@@ -33,4 +36,64 @@ body {
     border-radius: 5px;
     color: #fff;
     font-size: 0.8em;
+}
+
+/* In-game menu overlay */
+#inGameMenu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75); /* semi-transparent background */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+/* Hidden state for the menu */
+#inGameMenu.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Menu content box styling */
+.menuContent {
+    background: #333;
+    padding: 20px;
+    border: 2px solid #444;
+    text-align: center;
+    color: #fff;
+    border-radius: 10px;
+}
+
+/* Header inside the menu */
+.menuContent h2 {
+    margin-top: 0;
+}
+
+/* Style for the Quit button in the menu */
+.menuContent button {
+    margin: 10px;
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background: #555;
+    color: #eee;
+    transition: background 0.2s ease;
+}
+
+.menuContent button:hover {
+    background: #777;
+}
+
+/* (Optional) Styling for the scoreboard if needed */
+#scoreboard {
+    font-size: 1.2em;
+    margin-top: 10px;
 }
