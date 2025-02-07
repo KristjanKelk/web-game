@@ -100,16 +100,18 @@ saveSettingsBtn.addEventListener('click', () => {
     });
 });
 
-// Moderator clicks "Start Game"
+// Start button in the lobby (only visible to moderator)
 startButton.addEventListener('click', () => {
     socket.emit('startGame', roomCode);
 });
 
-// Listen for game start
+// When the server emits 'gameStarted', redirect all players:
 socket.on('gameStarted', () => {
-    alert('The game has started!');
-    // If you want to redirect to a game page, do it here:
-    // window.location.href = '/game.html';
+    // Optionally store any final data you need in localStorage:
+    // localStorage.setItem('someKey', JSON.stringify(yourData));
+
+    // Redirect to the actual game page
+    window.location.href = '/game.html';
 });
 
 // Listen for "lobbyClosed" event (means moderator left or disconnected)

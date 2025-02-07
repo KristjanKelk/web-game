@@ -172,6 +172,23 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('settingsUpdated', settings);
     });
 
+    // Inside your io.on('connection', ...) block
+    socket.on('playerMove', (data) => {
+        // data: { roomCode, playerName, position }
+        const { roomCode, playerName, position } = data;
+        if (!rooms[roomCode]) return;
+
+        // You can store/update the player's position on the server (optional)
+        if (!rooms[roomCode].positions) {
+            rooms[roomCode].positions = {};
+        }
+        rooms[roomCode].positions[socket.id] = { playerName, position };
+
+        // Broadcast all players' positions to everyone in the room
+        io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
+    });
+
+
 });
 
 server.listen(PORT, () => {

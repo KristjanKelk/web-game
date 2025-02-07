@@ -1,0 +1,36 @@
+/* public/styles/game.css */
+body {
+    margin: 0;
+    padding: 0;
+    background: #222;
+    color: #eee;
+    font-family: Arial, sans-serif;
+}
+
+#gameContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+#board {
+    position: relative;
+    width: 80vw;
+    height: 60vh;
+    background: #333;
+    border: 2px solid #444;
+    margin-bottom: 20px;
+}
+
+.avatar {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 0.8em;
+}
