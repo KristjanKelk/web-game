@@ -35,8 +35,13 @@ io.on('connection', (socket) => {
         // We create the room object but do NOT put the creator into it yet.
         // We'll handle actual joining in the 'joinGame' event.
         rooms[roomCode] = {
-            moderator: null,  // We'll set this when the first player joins
-            players: {}
+            moderator: socket.id,
+            players: {},
+            settings: {
+                // example defaults
+                difficulty: 'Easy',
+                rounds: 3,
+            }
         };
 
         // Tell the client the new room code
@@ -142,6 +147,31 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    // Update game settings (only moderator can do this)
+    socket.on('updateGameSettings', (data) => {
+        // data: { roomCode, settings: { ...some settings... } }
+        const { roomCode, settings } = data;
+
+        // Make sure room exists
+        if (!rooms[roomCode]) {
+            socket.emit('settingsError', 'Room does not exist.');
+            return;
+        }
+
+        // Only the moderator can update settings
+        if (rooms[roomCode].moderator !== socket.id) {
+            socket.emit('settingsError', 'Only the moderator can update settings.');
+            return;
+        }
+
+        // Store the settings in the room object
+        rooms[roomCode].settings = settings;
+
+        // Broadcast the updated settings to everyone in the room
+        io.to(roomCode).emit('settingsUpdated', settings);
+    });
+
 });
 
 server.listen(PORT, () => {

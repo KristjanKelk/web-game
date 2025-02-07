@@ -10,6 +10,18 @@ const startButton = document.getElementById('startButton');
 const leaveLobbyButton = document.getElementById('leaveLobbyButton');
 const lobbyErrorMsg = document.getElementById('lobbyErrorMsg');
 
+// Settings elements
+const gameSettingsPanel = document.getElementById('gameSettingsPanel');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const settingsErrorMsg = document.getElementById('settingsErrorMsg');
+const difficultySelect = document.getElementById('difficultySelect');
+const roundsInput = document.getElementById('roundsInput');
+
+// Displayed for everyone (read-only)
+const displaySettingsDiv = document.getElementById('displaySettings');
+const displayDifficulty = document.getElementById('displayDifficulty');
+const displayRounds = document.getElementById('displayRounds');
+
 // Validate roomCode and playerName
 if (!roomCode || !playerName) {
     lobbyErrorMsg.textContent = 'Room Code or Player Name missing. Redirecting...';
@@ -48,12 +60,44 @@ socket.on('updatePlayerList', (players) => {
         playersList.appendChild(li);
     });
 
-    // Show "Start Game" button only to the moderator (first player)
-    if (players.length > 0 && players[0].name === playerName) {
-        startButton.style.display = 'inline-block';
-    } else {
-        startButton.style.display = 'none';
-    }
+    // Check if *I* am the moderator
+    const amIModerator = (players.length > 0 && players[0].name === playerName);
+
+    // Show "Start Game" only if I'm the moderator
+    startButton.style.display = amIModerator ? 'inline-block' : 'none';
+
+    // Show the settings panel only if I'm the moderator
+    gameSettingsPanel.style.display = amIModerator ? 'block' : 'none';
+    // Show the read-only display for everyone
+    displaySettingsDiv.style.display = 'block';
+});
+
+// Listen for updated settings from the server
+socket.on('settingsUpdated', (settings) => {
+    // Update the read-only display
+    displayDifficulty.textContent = settings.difficulty;
+    displayRounds.textContent = settings.rounds;
+});
+
+// If there's an error updating settings
+socket.on('settingsError', (msg) => {
+    settingsErrorMsg.textContent = msg;
+});
+
+// Moderator clicks "Save Settings"
+saveSettingsBtn.addEventListener('click', () => {
+    settingsErrorMsg.textContent = ''; // clear old error
+
+    const newSettings = {
+        difficulty: difficultySelect.value,
+        rounds: parseInt(roundsInput.value, 10) || 1
+    };
+
+    // Send to server
+    socket.emit('updateGameSettings', {
+        roomCode,
+        settings: newSettings
+    });
 });
 
 // Moderator clicks "Start Game"

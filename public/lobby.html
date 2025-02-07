@@ -13,11 +13,37 @@
     <p id="roomInfo"></p>
     <ul id="playersList"></ul>
 
+    <!-- Game Settings (Moderator Only) -->
+    <fieldset id="gameSettingsPanel" style="display: none;">
+        <legend>Game Settings (Moderator Only)</legend>
+
+        <label for="difficultySelect">Difficulty:</label>
+        <select id="difficultySelect">
+            <option value="Easy">Easy</option>
+            <option value="Hard">Hard</option>
+        </select>
+        <br /><br />
+
+        <label for="roundsInput">Rounds:</label>
+        <input type="number" id="roundsInput" min="1" max="10" value="3" />
+        <br /><br />
+
+        <button id="saveSettingsBtn">Save Settings</button>
+        <p id="settingsErrorMsg" class="error"></p>
+    </fieldset>
+
     <!-- Moderator-only Start button -->
     <button id="startButton" style="display: none;">Start Game</button>
 
-    <!-- Every player can leave -->
-    <button id="leaveLobbyButton" style="display: inline-block;">Leave Lobby</button>
+    <!-- Everyone can leave -->
+    <button id="leaveLobbyButton">Leave Lobby</button>
+
+    <!-- Display settings to non-moderators (read-only) -->
+    <div id="displaySettings" style="margin-top: 20px; display: none;">
+        <h3>Current Settings</h3>
+        <p>Difficulty: <span id="displayDifficulty"></span></p>
+        <p>Rounds: <span id="displayRounds"></span></p>
+    </div>
 
     <p id="lobbyErrorMsg"></p>
 </div>
