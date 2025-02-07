@@ -7,9 +7,10 @@ const playerName = localStorage.getItem('playerName');
 const roomInfo = document.getElementById('roomInfo');
 const playersList = document.getElementById('playersList');
 const startButton = document.getElementById('startButton');
+const leaveLobbyButton = document.getElementById('leaveLobbyButton');
 const lobbyErrorMsg = document.getElementById('lobbyErrorMsg');
 
-// Validate that roomCode and playerName exist; if not, redirect back.
+// Validate roomCode and playerName
 if (!roomCode || !playerName) {
     lobbyErrorMsg.textContent = 'Room Code or Player Name missing. Redirecting...';
     setTimeout(() => {
@@ -17,12 +18,11 @@ if (!roomCode || !playerName) {
     }, 3000);
 } else {
     roomInfo.textContent = `Room Code: ${roomCode}`;
-
-    // Emit join event so this socket joins the room.
+    // Join the lobby
     socket.emit('joinGame', { roomCode, playerName });
 }
 
-// Listen for join errors from the server (e.g., if the room isn’t found).
+// Handle join errors from server
 socket.on('joinError', (msg) => {
     lobbyErrorMsg.textContent = msg;
     setTimeout(() => {
@@ -30,17 +30,25 @@ socket.on('joinError', (msg) => {
     }, 3000);
 });
 
-// Listen for updates to the player list.
+// Update the player list
 socket.on('updatePlayerList', (players) => {
     playersList.innerHTML = '';
+
+    // The first player in 'players' array is always the moderator
     players.forEach((player, index) => {
         const li = document.createElement('li');
-        // Mark moderator (assumed first player) and indicate your own name.
-        li.textContent = player.name + (index === 0 ? ' (Moderator)' : (player.name === playerName ? ' (You)' : ''));
+        let label = player.name;
+        if (index === 0) {
+            label += ' (Moderator)';
+        }
+        if (player.name === playerName) {
+            label += ' (You)';
+        }
+        li.textContent = label;
         playersList.appendChild(li);
     });
 
-    // Show the start button only if you are the moderator.
+    // Show "Start Game" button only to the moderator (first player)
     if (players.length > 0 && players[0].name === playerName) {
         startButton.style.display = 'inline-block';
     } else {
@@ -48,14 +56,34 @@ socket.on('updatePlayerList', (players) => {
     }
 });
 
-// When the moderator clicks "Start Game"
+// Moderator clicks "Start Game"
 startButton.addEventListener('click', () => {
     socket.emit('startGame', roomCode);
 });
 
-// Listen for the game start event.
+// Listen for game start
 socket.on('gameStarted', () => {
     alert('The game has started!');
-    // Redirect to the game screen if needed:
+    // If you want to redirect to a game page, do it here:
     // window.location.href = '/game.html';
+});
+
+// Listen for "lobbyClosed" event (means moderator left or disconnected)
+socket.on('lobbyClosed', () => {
+    alert('The lobby has been closed by the moderator.');
+    window.location.href = '/';
+});
+
+// Handle user clicking "Leave Lobby"
+leaveLobbyButton.addEventListener('click', () => {
+    // Emit leave event
+    socket.emit('leaveLobby', roomCode);
+
+    // Non-moderator will be removed from the room. We can
+    // immediately redirect them. The server will handle
+    // the rest.
+    // For the moderator, the server will broadcast 'lobbyClosed',
+    // which triggers *all* players to redirect. The moderator
+    // can either rely on that, or just do an immediate redirect too:
+    window.location.href = '/';
 });

@@ -1,4 +1,3 @@
-// server/server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,7 +7,7 @@ const PORT = 3000;
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from public folder
+// Serve static files
 app.use(express.static(__dirname + '/../public'));
 
 // Serve index.html for the root path
@@ -17,7 +16,7 @@ app.get('/', (req, res) => {
 });
 
 // Object to hold active rooms
-// Each room is an object: { moderator: socketId, players: { socketId: { name } } }
+// Each room: { moderator: socketId, players: { socketId: { name } } }
 const rooms = {};
 
 // Utility to generate a random 6-character room code
@@ -28,51 +27,58 @@ function generateRoomCode() {
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    // Handle game creation
+    // CREATE GAME
     socket.on('createGame', (data) => {
-        // data: { playerName }
+        // data: { playerName, gameName }
         const roomCode = generateRoomCode();
+
+        // We create the room object but do NOT put the creator into it yet.
+        // We'll handle actual joining in the 'joinGame' event.
         rooms[roomCode] = {
-            moderator: socket.id,
+            moderator: null,  // We'll set this when the first player joins
             players: {}
         };
-        // Add creator as the first player
-        rooms[roomCode].players[socket.id] = { name: data.playerName };
-        socket.join(roomCode);
-        // Send the room code back so the client can redirect to the lobby page
-        socket.emit('gameCreated', { roomCode, players: rooms[roomCode].players });
-        // Broadcast updated player list (only one player now)
-        io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
+
+        // Tell the client the new room code
+        socket.emit('gameCreated', { roomCode });
     });
 
-    // Handle joining an existing game
-    socket.on('joinGame', (data) => {
-        // data: { roomCode, playerName }
-        const { roomCode, playerName } = data;
+
+    // JOIN GAME
+    socket.on('joinGame', ({ roomCode, playerName }) => {
         if (!rooms[roomCode]) {
             socket.emit('joinError', 'Room does not exist.');
             return;
         }
-        // Check for maximum players (5 per room)
-        if (Object.keys(rooms[roomCode].players).length >= 5) {
-            socket.emit('joinError', 'Room is full.');
+        const room = rooms[roomCode];
+
+        // Check if already full
+        if (Object.keys(room.players).length >= 5) {
+            socket.emit('joinError', 'Room is full (max 5).');
             return;
         }
-        // Validate unique name within the room
-        const nameTaken = Object.values(rooms[roomCode].players).some(
-            (player) => player.name === playerName
-        );
+
+        // Check name uniqueness
+        const nameTaken = Object.values(room.players).some(p => p.name === playerName);
         if (nameTaken) {
             socket.emit('joinError', 'Name already taken in this room.');
             return;
         }
-        // Add the player to the room and join the socket room
-        rooms[roomCode].players[socket.id] = { name: playerName };
+
+        // If the room has no moderator, this new player becomes moderator
+        if (!room.moderator || Object.keys(room.players).length === 0) {
+            room.moderator = socket.id;
+        }
+
+        // Add player to the room
+        room.players[socket.id] = { name: playerName };
         socket.join(roomCode);
-        io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
+
+        // Send out the updated player list
+        io.to(roomCode).emit('updatePlayerList', Object.values(room.players));
     });
 
-    // Handle starting the game (only moderator allowed)
+    // START GAME (Only Moderator)
     socket.on('startGame', (roomCode) => {
         if (!rooms[roomCode]) return;
         if (rooms[roomCode].moderator !== socket.id) {
@@ -82,31 +88,56 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('gameStarted');
     });
 
-    // Handle disconnect: remove the player from their room
+    // LEAVE LOBBY (explicit action from the client)
+    socket.on('leaveLobby', (roomCode) => {
+        if (!rooms[roomCode]) return;
+
+        const isModerator = rooms[roomCode].moderator === socket.id;
+
+        if (isModerator) {
+            // Moderator closes the entire lobby
+            io.to(roomCode).emit('lobbyClosed');
+            delete rooms[roomCode]; // remove the room from the server
+        } else {
+            // Just remove this user
+            delete rooms[roomCode].players[socket.id];
+            socket.leave(roomCode);
+
+            // Broadcast updated list
+            io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
+
+            // If no players remain, remove the room
+            if (Object.keys(rooms[roomCode].players).length === 0) {
+                delete rooms[roomCode];
+                console.log(`Room ${roomCode} deleted due to no players.`);
+            }
+        }
+    });
+
+    // DISCONNECT
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
+        // Find any room this user was in
         for (const roomCode in rooms) {
             if (rooms[roomCode].players[socket.id]) {
+                const isModerator = rooms[roomCode].moderator === socket.id;
+
+                // Remove the player
                 delete rooms[roomCode].players[socket.id];
 
-                // If the disconnecting socket was the moderator, assign a new one if possible.
-                if (rooms[roomCode].moderator === socket.id) {
-                    const playerIDs = Object.keys(rooms[roomCode].players);
-                    if (playerIDs.length > 0) {
-                        rooms[roomCode].moderator = playerIDs[0];
+                if (isModerator) {
+                    // Close the entire lobby if moderator disconnects
+                    io.to(roomCode).emit('lobbyClosed');
+                    delete rooms[roomCode];
+                } else {
+                    // Update remaining players
+                    io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
+
+                    // If empty, remove the room
+                    if (Object.keys(rooms[roomCode].players).length === 0) {
+                        delete rooms[roomCode];
+                        console.log(`Room ${roomCode} deleted due to inactivity.`);
                     }
-                }
-
-                io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
-
-                // If the room is now empty, delay deletion for 60 seconds.
-                if (Object.keys(rooms[roomCode].players).length === 0) {
-                    setTimeout(() => {
-                        if (rooms[roomCode] && Object.keys(rooms[roomCode].players).length === 0) {
-                            delete rooms[roomCode];
-                            console.log(`Room ${roomCode} deleted due to inactivity.`);
-                        }
-                    }, 60000); // 60,000 ms = 60 seconds
                 }
             }
         }

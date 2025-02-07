@@ -12,7 +12,13 @@
     <h1>Game Lobby</h1>
     <p id="roomInfo"></p>
     <ul id="playersList"></ul>
-    <button id="startButton">Start Game</button>
+
+    <!-- Moderator-only Start button -->
+    <button id="startButton" style="display: none;">Start Game</button>
+
+    <!-- Every player can leave -->
+    <button id="leaveLobbyButton" style="display: inline-block;">Leave Lobby</button>
+
     <p id="lobbyErrorMsg"></p>
 </div>
 <script src="/js/lobby.js"></script>

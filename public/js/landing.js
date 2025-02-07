@@ -45,17 +45,17 @@ createGameForm.addEventListener('submit', (e) => {
     const playerName = createNameInput.value.trim();
     const gameName = gameNameInput.value.trim();
     if (playerName && gameName) {
-        // Send createGame event with player's name and game name.
         socket.emit('createGame', { playerName, gameName });
     }
 });
 
-// Listen for game creation response
+// Listen for server response
 socket.on('gameCreated', (data) => {
-    // Save room and player info locally and redirect to the lobby.
+    // data: { roomCode }
     localStorage.setItem('roomCode', data.roomCode);
     localStorage.setItem('playerName', createNameInput.value.trim());
     localStorage.setItem('gameName', gameNameInput.value.trim());
+    // Move to the lobby page
     window.location.href = '/lobby.html';
 });
 
