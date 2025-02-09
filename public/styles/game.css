@@ -97,3 +97,19 @@ body {
     font-size: 1.2em;
     margin-top: 10px;
 }
+
+/* For resource elements */
+.resource {
+    border-radius: 50%;
+}
+
+/* Style the scoreboard and timer */
+#scoreboard, #timer {
+    font-size: 1.2em;
+    margin: 10px;
+}
+
+.remoteAvatar {
+    border: 2px solid white;
+    border-radius: 5px;
+}

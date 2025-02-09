@@ -12,10 +12,15 @@
     <h1>My Multiplayer Game</h1>
     <!-- Game board and scoreboard -->
     <div id="board"></div>
-    <div id="scoreboard"></div>
+    <div id="scoreboard">
+        Score: <span id="score">0</span>
+    </div>
+    <div id="timer">
+        Time Left: <span id="timeLeft">60</span>s
+    </div>
 </div>
 
-<!-- In-game menu overlay -->
+<!-- In-game menu overlay (for pause/resume/quit) -->
 <div id="inGameMenu" class="hidden">
     <div class="menuContent">
         <h2>Game Menu</h2>
@@ -25,6 +30,6 @@
     </div>
 </div>
 
-<script src="/js/game.js"></script>
+<script type="module" src="/js/game/game.js"></script>
 </body>
 </html>
