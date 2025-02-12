@@ -4,17 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Game Page</title>
+    <!-- Ensure game.css defines dimensions and styling for the board, inGameMenu, etc. -->
     <link rel="stylesheet" href="/styles/game.css" />
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 <div id="gameContainer">
     <h1>My Multiplayer Game</h1>
-    <!-- Game board and scoreboard -->
+    <!-- Game board: All dynamic elements (resources, walls, remote players) -->
     <div id="board"></div>
+    <!-- Scoreboard: Shows the player's score -->
     <div id="scoreboard">
         Score: <span id="score">0</span>
     </div>
+    <!-- Timer: Shows the time left (updated authoritatively by the server) -->
     <div id="timer">
         Time Left: <span id="timeLeft">60</span>s
     </div>
@@ -30,6 +33,7 @@
     </div>
 </div>
 
+<!-- Load the main game JS module -->
 <script type="module" src="/js/game/game.js"></script>
 </body>
 </html>

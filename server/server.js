@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
 });
 
 // Object to hold active rooms
-// Each room: { moderator, players, settings, inGame, startTime, duration, timerInterval, resources, positions }
+// Each room: { moderator, players, settings, inGame, startTime, duration, timerInterval, resources, positions, labyrinthLayout }
 const rooms = {};
 
 // Utility to generate a random 6-character room code
@@ -24,28 +24,90 @@ function generateRoomCode() {
     return Math.random().toString(36).substr(2, 6).toUpperCase();
 }
 
-// --- Resource Spawning Helper ---
+// Function to generate a labyrinth layout based on difficulty for a 1300x1000 board.
+function generateLabyrinth(difficulty) {
+    const boardWidth = 1300;
+    const boardHeight = 1000;
+    const cols = 26;
+    const rows = 20;
+    const cellWidth = boardWidth / cols;  // 50px
+    const cellHeight = boardHeight / rows;  // 50px
+
+    let wallProbability = 0.2; // Default for Easy
+    if (difficulty === 'hard') {
+        wallProbability = 0.5;
+    }
+
+    const walls = [];
+    const centerCol = Math.floor(cols / 2);
+    const centerRow = Math.floor(rows / 2);
+    // Define a clear zone (for safe spawning): clear central 3 columns and 3 rows.
+    const clearZoneCols = [centerCol - 1, centerCol, centerCol + 1];
+    const clearZoneRows = [centerRow - 1, centerRow, centerRow + 1];
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            if (clearZoneCols.includes(c) && clearZoneRows.includes(r)) {
+                continue;
+            }
+            if (Math.random() < wallProbability) {
+                walls.push({
+                    x: c * cellWidth,
+                    y: r * cellHeight,
+                    width: cellWidth,
+                    height: cellHeight
+                });
+            }
+        }
+    }
+    console.log("Generated labyrinth layout:", walls);
+    return walls;
+}
+
+// Helper function: Check if (x, y) is inside any wall in the labyrinth layout.
+function isInsideWall(x, y, labyrinthLayout) {
+    for (const wall of labyrinthLayout) {
+        if (x >= wall.x && x < wall.x + wall.width &&
+            y >= wall.y && y < wall.y + wall.height) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Modified resource spawning to avoid spawning inside walls.
 function spawnResourceForRoom(roomCode) {
     if (!rooms[roomCode] || !rooms[roomCode].inGame) return;
+    // Use the stored labyrinth layout
+    const labyrinthLayout = rooms[roomCode].labyrinthLayout || [];
+    let candidateX, candidateY;
+    let maxAttempts = 10, attempts = 0;
+    do {
+        candidateX = Math.random() * 1300; // board width
+        candidateY = Math.random() * 1000; // board height
+        attempts++;
+    } while (attempts < maxAttempts && isInsideWall(candidateX, candidateY, labyrinthLayout));
 
-    // Create a resource object with a unique id, random position, and type.
-    // Adjust the multipliers (500, 300) to fit your board's dimensions.
+    if (attempts === maxAttempts && isInsideWall(candidateX, candidateY, labyrinthLayout)) {
+        // Could not find an open space; skip spawning.
+        return;
+    }
+
+    const isPowerUp = Math.random() < 0.2;
     const resource = {
         id: Math.random().toString(36).substr(2, 9),
-        left: Math.random() * 500,
-        top: Math.random() * 300,
-        type: 'normal' // Extend with 'powerup' later if needed.
+        left: candidateX,
+        top: candidateY,
+        type: isPowerUp ? 'powerup' : 'normal'
     };
 
-    // Ensure the room has a resources array.
     if (!rooms[roomCode].resources) {
         rooms[roomCode].resources = [];
     }
     rooms[roomCode].resources.push(resource);
-    // Broadcast the new resource to all clients in the room.
     io.to(roomCode).emit('resourceSpawned', resource);
 
-    // Remove the resource after 10 seconds if not collected.
+    // Remove resource after 10 seconds if not collected.
     setTimeout(() => {
         if (rooms[roomCode] && rooms[roomCode].resources) {
             rooms[roomCode].resources = rooms[roomCode].resources.filter(r => r.id !== resource.id);
@@ -79,7 +141,8 @@ io.on('connection', (socket) => {
             },
             inGame: false,
             resources: [],
-            positions: {}
+            positions: {},
+            labyrinthLayout: []  // Will be set when game starts.
         };
         socket.emit('gameCreated', { roomCode });
     });
@@ -91,19 +154,15 @@ io.on('connection', (socket) => {
             return;
         }
         const room = rooms[roomCode];
-
-        // Check if already full
         if (Object.keys(room.players).length >= 5) {
             socket.emit('joinError', 'Room is full (max 5).');
             return;
         }
-        // Check name uniqueness
         const nameTaken = Object.values(room.players).some(p => p.name === playerName);
         if (nameTaken) {
             socket.emit('joinError', 'Name already taken in this room.');
             return;
         }
-        // If the room has no moderator, assign this player as moderator.
         if (!room.moderator || Object.keys(room.players).length === 0) {
             room.moderator = socket.id;
         }
@@ -123,6 +182,10 @@ io.on('connection', (socket) => {
         }
         socket.join(roomCode);
         console.log(`Player ${playerName} joined game state for room ${roomCode}`);
+        // If the game is already in progress and a labyrinth layout exists, send it to the joining socket.
+        if (rooms[roomCode].inGame && rooms[roomCode].labyrinthLayout.length > 0) {
+            socket.emit('labyrinthLayout', rooms[roomCode].labyrinthLayout);
+        }
     });
 
     // START GAME (Only Moderator)
@@ -133,9 +196,9 @@ io.on('connection', (socket) => {
             return;
         }
         rooms[roomCode].inGame = true;
-        // Set timer values for authoritative timer.
         rooms[roomCode].startTime = Date.now();
-        rooms[roomCode].duration = 60 * 1000; // 60 seconds in milliseconds.
+        rooms[roomCode].duration = 60 * 1000; // 60 seconds
+
         rooms[roomCode].timerInterval = setInterval(() => {
             const elapsed = Date.now() - rooms[roomCode].startTime;
             let timeLeft = Math.max(0, Math.floor((rooms[roomCode].duration - elapsed) / 1000));
@@ -143,13 +206,19 @@ io.on('connection', (socket) => {
             if (timeLeft <= 0) {
                 clearInterval(rooms[roomCode].timerInterval);
                 io.to(roomCode).emit('gameOver', { message: 'Time is up! Game over.' });
-                // Optionally, additional cleanup here.
             }
         }, 1000);
+
+        // Generate labyrinth layout based on the room's difficulty.
+        const difficulty = (rooms[roomCode].settings.difficulty || 'Easy').toLowerCase();
+        const labyrinthLayout = generateLabyrinth(difficulty);
+        rooms[roomCode].labyrinthLayout = labyrinthLayout;
+        io.to(roomCode).emit('labyrinthLayout', labyrinthLayout);
+
         io.to(roomCode).emit('gameStarted');
     });
 
-    // LEAVE LOBBY (explicit action)
+    // LEAVE LOBBY
     socket.on('leaveLobby', (roomCode) => {
         if (!rooms[roomCode]) return;
         const isModerator = rooms[roomCode].moderator === socket.id;
@@ -216,13 +285,20 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
     });
 
-
     // RESOURCE COLLECTED
     socket.on('resourceCollected', (data) => {
         const { roomCode, resourceId, playerName } = data;
         if (!rooms[roomCode] || !rooms[roomCode].resources) return;
+        const collected = rooms[roomCode].resources.find(r => r.id === resourceId);
         rooms[roomCode].resources = rooms[roomCode].resources.filter(r => r.id !== resourceId);
         io.to(roomCode).emit('resourceRemoved', resourceId);
+        if (collected && collected.type === 'powerup') {
+            io.to(roomCode).emit('powerUpEffect', {
+                source: playerName,
+                effect: 'slow',    // e.g., a slow-down effect
+                duration: 5000     // lasts for 5 seconds
+            });
+        }
     });
 
     // GAME ACTION (pause, resume, quit)
@@ -243,18 +319,14 @@ io.on('connection', (socket) => {
                 io.to(roomCode).emit('gameResumed', { message: `${playerName} resumed the game.` });
                 break;
             case 'quit':
-                // For non-moderators, remove them from the room and notify them with a gameQuit event.
                 if (rooms[roomCode].moderator !== socket.id) {
                     socket.leave(roomCode);
                     delete rooms[roomCode].players[socket.id];
                     console.log(`Non-moderator ${playerName} quitting room ${roomCode}`);
-                    // Emit gameQuit specifically to the quitting socket so it can redirect.
                     socket.emit('gameQuit', { message: `${playerName} quit the game.` });
-                    // Update the remaining players.
                     io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
                     io.to(roomCode).emit('playerLeft', { message: `${playerName} left the game.` });
                 } else {
-                    // If the moderator quits, broadcast a global quit event.
                     console.log(`Moderator ${playerName} requested to quit room ${roomCode}`);
                     io.to(roomCode).emit('gameQuit', { message: `${playerName} quit the game.` });
                 }
@@ -264,7 +336,6 @@ io.on('connection', (socket) => {
                 break;
         }
     });
-
 });
 
 server.listen(PORT, () => {

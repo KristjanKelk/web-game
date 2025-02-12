@@ -1,5 +1,6 @@
-// ... (other imports and initial code)
+// public/js/game/game.js
 import { Player } from './player.js';
+import { ResourceManager } from './resource.js';
 
 const socket = io();
 
@@ -25,7 +26,7 @@ socket.on('joinError', (msg) => {
 // DOM references
 const board = document.getElementById('board');
 const scoreboard = document.getElementById('scoreboard');
-const timerDisplay = document.getElementById('timeLeft'); // Ensure your HTML has this element
+const timerDisplay = document.getElementById('timeLeft'); // Must exist in your HTML
 
 // In-game menu elements
 const inGameMenu = document.getElementById('inGameMenu');
@@ -36,7 +37,7 @@ const menuMessage = document.getElementById('menuMessage');
 // Game state variables
 let gamePaused = false;
 let score = 0;
-// The timer is now authoritative from the server.
+let lastEmit = Date.now();
 
 // Update the scoreboard display
 function updateScore(points) {
@@ -48,61 +49,68 @@ function updateScore(points) {
 const initialPosition = { x: board.clientWidth / 2, y: board.clientHeight / 2 };
 const player = new Player(board, initialPosition, 'blue');
 
+// Initialize the Resource Manager.
+const resourceManager = new ResourceManager(board, socket, roomCode, playerName, updateScore);
+resourceManager.init();
+
 // -------------------------
-// Resource Handling Section
+// Wall (Labyrinth) Handling
 // -------------------------
+const wallsOnScreen = {};
 
-// Global object to store resources currently displayed on the client.
-const resourcesOnScreen = {};
+// Listen for the labyrinth layout event from the server.
+socket.on('labyrinthLayout', (layout) => {
+    console.log("Received labyrinth layout:", layout);
+    window.labyrinthLayout = layout; // Save layout globally for collision detection.
 
-// Listen for resource spawn events from the server.
-socket.on('resourceSpawned', (resource) => {
-    // Create a DOM element for the resource.
-    const resEl = document.createElement('div');
-    resEl.classList.add('resource');
-    resEl.style.position = 'absolute';
-    resEl.style.width = '20px';
-    resEl.style.height = '20px';
-    // Use purple for power-ups and yellow for normal resources.
-    resEl.style.backgroundColor = resource.type === 'powerup' ? 'purple' : 'yellow';
-    resEl.style.borderRadius = '50%';
-    resEl.style.left = resource.left + 'px';
-    resEl.style.top = resource.top + 'px';
-    board.appendChild(resEl);
-    resourcesOnScreen[resource.id] = resEl;
-});
-
-// Listen for resource removal events from the server.
-socket.on('resourceRemoved', (resourceId) => {
-    if (resourcesOnScreen[resourceId]) {
-        board.removeChild(resourcesOnScreen[resourceId]);
-        delete resourcesOnScreen[resourceId];
+    // Remove any existing walls.
+    for (const key in wallsOnScreen) {
+        board.removeChild(wallsOnScreen[key]);
     }
+    Object.keys(wallsOnScreen).forEach(key => delete wallsOnScreen[key]);
+
+    // Create wall elements.
+    layout.forEach(wall => {
+        const wallEl = document.createElement('div');
+        wallEl.classList.add('wall');
+        wallEl.style.position = 'absolute';
+        wallEl.style.left = wall.x + 'px';
+        wallEl.style.top = wall.y + 'px';
+        wallEl.style.width = wall.width + 'px';
+        wallEl.style.height = wall.height + 'px';
+        board.appendChild(wallEl);
+        wallsOnScreen[`${wall.x}-${wall.y}`] = wallEl;
+    });
 });
 
-// Collision detection: check for collisions between the local player's avatar and resources.
-function checkCollisions() {
-    const avatarRect = player.avatar.getBoundingClientRect();
-    for (const resourceId in resourcesOnScreen) {
-        const resEl = resourcesOnScreen[resourceId];
-        const resourceRect = resEl.getBoundingClientRect();
+// Check wall collisions using relative positions.
+function checkWallCollision(player) {
+    const avatarX = player.position.x;
+    const avatarY = player.position.y;
+    const avatarWidth = player.width;
+    const avatarHeight = player.height;
+
+    if (!window.labyrinthLayout) return false;
+
+    // Debug: log player's relative position.
+    console.log("Player position:", avatarX, avatarY, "size:", avatarWidth, avatarHeight);
+
+    for (const wall of window.labyrinthLayout) {
         if (
-            avatarRect.left < resourceRect.right &&
-            avatarRect.right > resourceRect.left &&
-            avatarRect.top < resourceRect.bottom &&
-            avatarRect.bottom > resourceRect.top
+            avatarX < wall.x + wall.width &&
+            avatarX + avatarWidth > wall.x &&
+            avatarY < wall.y + wall.height &&
+            avatarY + avatarHeight > wall.y
         ) {
-            // Collision detected: award points and notify the server.
-            updateScore(10);
-            socket.emit('resourceCollected', { roomCode, resourceId, playerName });
-            board.removeChild(resEl);
-            delete resourcesOnScreen[resourceId];
+            console.log("Wall collision detected with wall:", wall);
+            return true;
         }
     }
+    return false;
 }
 
 // -------------------------
-// End Resource Handling
+// End Wall Handling
 // -------------------------
 
 // Input handling for movement
@@ -129,7 +137,6 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
     if (gamePaused) return;
-    // Stop movement on key release.
     switch (e.key) {
         case 'ArrowUp':
         case 'w':
@@ -145,13 +152,26 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Main game loop using requestAnimationFrame
-let lastEmit = Date.now();
-
 function gameLoop() {
     if (!gamePaused) {
+        // Save current position in case we need to revert (for wall collision).
+        const previousPosition = { ...player.position };
+
+        // Update player position based on current velocity.
         player.update();
-        checkCollisions();
-        // Throttle the emission to every 100 ms.
+
+        // Check for wall collisions; if a collision is detected, revert the position
+        // and reset the velocity.
+        if (checkWallCollision(player)) {
+            player.position = previousPosition;
+            player.setVelocity(0, 0); // Stop movement to avoid continuous collision
+            player.update();
+        }
+
+        // Check resource collisions using the ResourceManager.
+        resourceManager.checkCollisions(player.avatar);
+
+        // Throttle the emission of player position to every 100ms.
         if (Date.now() - lastEmit > 100) {
             socket.emit('playerMove', { roomCode, playerName, position: player.position });
             lastEmit = Date.now();
@@ -161,18 +181,17 @@ function gameLoop() {
 }
 requestAnimationFrame(gameLoop);
 
-// Listen for authoritative timer updates from the server.
+
+// Socket listeners for authoritative timer and global game actions.
 socket.on('timeUpdate', (time) => {
     timerDisplay.textContent = time;
 });
 
-// Listen for game over event from the server.
 socket.on('gameOver', (data) => {
     alert(data.message);
     window.location.href = '/';
 });
 
-// In-game Menu Event Listeners
 resumeBtn.addEventListener('click', () => {
     console.log("Resume button clicked. Emitting resume action.");
     socket.emit('gameAction', { roomCode, action: 'resume', playerName });
@@ -182,8 +201,6 @@ quitBtn.addEventListener('click', () => {
     socket.emit('gameAction', { roomCode, action: 'quit', playerName });
 });
 
-
-// ESC key handling
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (!gamePaused) {
@@ -197,24 +214,31 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-
-// Socket listeners for global game actions.
 socket.on('gamePaused', (data) => {
     console.log("Received gamePaused event:", data);
     gamePaused = true;
-    menuMessage.textContent = data.message; // e.g., "Player X paused the game."
+    menuMessage.textContent = data.message;
     inGameMenu.classList.remove('hidden');
 });
 
 socket.on('gameResumed', (data) => {
     console.log("Received gameResumed event:", data);
     gamePaused = false;
-    console.log("gamePaused is now:", gamePaused);
-    menuMessage.textContent = data.message; // e.g., "Player X resumed the game."
-    // Hide the in-game menu after 2 seconds.
+    menuMessage.textContent = data.message;
     setTimeout(() => inGameMenu.classList.add('hidden'), 2000);
 });
 
+socket.on('powerUpEffect', (data) => {
+    console.log("Received power-up effect:", data);
+    if (playerName !== data.source) {
+        const originalSpeed = player.speed;
+        player.speed *= 0.5;
+        setTimeout(() => {
+            player.speed = originalSpeed;
+            console.log("Slow effect ended, speed restored.");
+        }, data.duration);
+    }
+});
 
 socket.on('gameQuit', (data) => {
     console.log("Received gameQuit event:", data);
@@ -227,27 +251,22 @@ socket.on('playerLeft', (data) => {
     menuMessage.textContent = data.message;
 });
 
-const remotePlayers = {}; // Object to track remote players keyed by socket id
+const remotePlayers = {};
 
 socket.on('playerPositions', (positions) => {
-    // Loop over all positions received from the server.
     for (const id in positions) {
-        // Skip our own socket id.
         if (id === socket.id) continue;
-
         let remotePlayer = remotePlayers[id];
         if (!remotePlayer) {
-            // Create a new DOM element for this remote player.
             remotePlayer = document.createElement('div');
             remotePlayer.classList.add('remoteAvatar');
             remotePlayer.style.width = '40px';
             remotePlayer.style.height = '40px';
             remotePlayer.style.position = 'absolute';
-            remotePlayer.style.backgroundColor = 'red'; // Distinguish from local player.
+            remotePlayer.style.backgroundColor = 'red';
             board.appendChild(remotePlayer);
             remotePlayers[id] = remotePlayer;
         }
-        // Update the remote player's position.
         const pos = positions[id].position;
         remotePlayer.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
     }
