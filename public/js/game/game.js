@@ -26,7 +26,7 @@ socket.on('joinError', (msg) => {
 // DOM references
 const board = document.getElementById('board');
 const scoreboard = document.getElementById('scoreboard');
-const timerDisplay = document.getElementById('timeLeft'); // Must exist in your HTML
+const timerDisplay = document.getElementById('timeLeft');
 
 // In-game menu elements
 const inGameMenu = document.getElementById('inGameMenu');
@@ -92,8 +92,8 @@ function checkWallCollision(player) {
 
     if (!window.labyrinthLayout) return false;
 
-    // Debug: log player's relative position.
-    console.log("Player position:", avatarX, avatarY, "size:", avatarWidth, avatarHeight);
+    // Debug: log player's relative position (optional)
+    // console.log("Player position:", avatarX, avatarY, "size:", avatarWidth, avatarHeight);
 
     for (const wall of window.labyrinthLayout) {
         if (
@@ -113,40 +113,62 @@ function checkWallCollision(player) {
 // End Wall Handling
 // -------------------------
 
-// Input handling for movement
+/**
+ * Track which keys are currently pressed.
+ * We'll calculate velocity inside the game loop based on these flags,
+ * rather than setting velocity immediately on key events.
+ */
+const keysDown = {
+    up: false,
+    down: false,
+    left: false,
+    right: false
+};
+
+// Listen for keydown events
 window.addEventListener('keydown', (e) => {
     if (gamePaused) return;
+
     switch (e.key) {
         case 'ArrowUp':
         case 'w':
-            player.setVelocity(0, -player.speed);
+            keysDown.up = true;
             break;
         case 'ArrowDown':
         case 's':
-            player.setVelocity(0, player.speed);
+            keysDown.down = true;
             break;
         case 'ArrowLeft':
         case 'a':
-            player.setVelocity(-player.speed, 0);
+            keysDown.left = true;
             break;
         case 'ArrowRight':
         case 'd':
-            player.setVelocity(player.speed, 0);
+            keysDown.right = true;
             break;
     }
 });
+
+// Listen for keyup events
 window.addEventListener('keyup', (e) => {
     if (gamePaused) return;
+
     switch (e.key) {
         case 'ArrowUp':
         case 'w':
+            keysDown.up = false;
+            break;
         case 'ArrowDown':
         case 's':
+            keysDown.down = false;
+            break;
         case 'ArrowLeft':
         case 'a':
+            keysDown.left = false;
+            break;
         case 'ArrowRight':
         case 'd':
-            player.setVelocity(0, 0);
+            keysDown.right = false;
             break;
     }
 });
@@ -154,33 +176,45 @@ window.addEventListener('keyup', (e) => {
 // Main game loop using requestAnimationFrame
 function gameLoop() {
     if (!gamePaused) {
-        // Save current position in case we need to revert (for wall collision).
+        // 1. Determine velocity from the keysDown object
+        let vx = 0, vy = 0;
+        if (keysDown.up)    vy -= player.speed;
+        if (keysDown.down)  vy += player.speed;
+        if (keysDown.left)  vx -= player.speed;
+        if (keysDown.right) vx += player.speed;
+
+        // 2. Apply this velocity to our local player
+        player.setVelocity(vx, vy);
+
+        // 3. Save current position in case we need to revert (wall collision)
         const previousPosition = { ...player.position };
 
-        // Update player position based on current velocity.
+        // 4. Update the player's position based on the velocity
         player.update();
 
-        // Check for wall collisions; if a collision is detected, revert the position
-        // and reset the velocity.
+        // 5. Check for wall collisions; revert if needed
         if (checkWallCollision(player)) {
             player.position = previousPosition;
             player.setVelocity(0, 0); // Stop movement to avoid continuous collision
             player.update();
         }
 
-        // Check resource collisions using the ResourceManager.
+        // 6. Check resource collisions using the ResourceManager.
         resourceManager.checkCollisions(player.avatar);
 
-        // Throttle the emission of player position to every 100ms.
+        // 7. Throttle the emission of player position to every 100ms
         if (Date.now() - lastEmit > 100) {
-            socket.emit('playerMove', { roomCode, playerName, position: player.position });
+            socket.emit('playerMove', {
+                roomCode,
+                playerName,
+                position: player.position
+            });
             lastEmit = Date.now();
         }
     }
     requestAnimationFrame(gameLoop);
 }
 requestAnimationFrame(gameLoop);
-
 
 // Socket listeners for authoritative timer and global game actions.
 socket.on('timeUpdate', (time) => {

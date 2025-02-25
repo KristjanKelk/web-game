@@ -35,7 +35,7 @@ function generateLabyrinth(difficulty) {
 
     let wallProbability = 0.2; // Default for Easy
     if (difficulty === 'hard') {
-        wallProbability = 0.5;
+        wallProbability = 0.35;
     }
 
     const walls = [];
