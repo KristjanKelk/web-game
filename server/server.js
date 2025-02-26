@@ -41,12 +41,21 @@ function generateLabyrinth(difficulty) {
     const walls = [];
     const centerCol = Math.floor(cols / 2);
     const centerRow = Math.floor(rows / 2);
-    // Define a clear zone (for safe spawning): clear central 3 columns and 3 rows.
-    const clearZoneCols = [centerCol - 1, centerCol, centerCol + 1];
-    const clearZoneRows = [centerRow - 1, centerRow, centerRow + 1];
+
+    // Increase the clear zone size: 2 cells on each side, so a 5x5 area is always clear.
+    const clearZoneSize = 2;
+    const clearZoneCols = [];
+    const clearZoneRows = [];
+    for (let i = centerCol - clearZoneSize; i <= centerCol + clearZoneSize; i++) {
+        clearZoneCols.push(i);
+    }
+    for (let i = centerRow - clearZoneSize; i <= centerRow + clearZoneSize; i++) {
+        clearZoneRows.push(i);
+    }
 
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
+            // Skip cells in the clear zone so that no walls appear there.
             if (clearZoneCols.includes(c) && clearZoneRows.includes(r)) {
                 continue;
             }
@@ -166,9 +175,21 @@ io.on('connection', (socket) => {
         if (!room.moderator || Object.keys(room.players).length === 0) {
             room.moderator = socket.id;
         }
-        room.players[socket.id] = { name: playerName };
+
+        // Add player with initial score 0.
+        room.players[socket.id] = { name: playerName, score: 0 };
+
         socket.join(roomCode);
+        // Emit the updated player list (if needed elsewhere)
         io.to(roomCode).emit('updatePlayerList', Object.values(room.players));
+
+        // Build a scores object and emit it.
+        const allScores = {};
+        for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+            allScores[playerObj.name] = playerObj.score;
+        }
+        console.log("Emitting scoresUpdated:", allScores);
+        io.to(roomCode).emit('scoresUpdated', allScores);
     });
 
     // JOIN GAME STATE (from game.html)
@@ -181,11 +202,24 @@ io.on('connection', (socket) => {
             return;
         }
         socket.join(roomCode);
+
+        // If the player is not already in the room, add them with an initial score of 0.
+        if (!rooms[roomCode].players[socket.id]) {
+            rooms[roomCode].players[socket.id] = { name: playerName, score: 0 };
+        }
+
         console.log(`Player ${playerName} joined game state for room ${roomCode}`);
-        // If the game is already in progress and a labyrinth layout exists, send it to the joining socket.
+
+        // If the game is in progress and a labyrinth layout exists, send it.
         if (rooms[roomCode].inGame && rooms[roomCode].labyrinthLayout.length > 0) {
             socket.emit('labyrinthLayout', rooms[roomCode].labyrinthLayout);
         }
+        // Build and emit current scores to the joining socket.
+        const allScores = {};
+        for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+            allScores[playerObj.name] = playerObj.score;
+        }
+        socket.emit('scoresUpdated', allScores);
     });
 
     // START GAME (Only Moderator)
@@ -241,19 +275,19 @@ io.on('connection', (socket) => {
         console.log(`User disconnected: ${socket.id}`);
         for (const roomCode in rooms) {
             if (rooms[roomCode].players[socket.id]) {
-                const isModerator = rooms[roomCode].moderator === socket.id;
+                //const isModerator = rooms[roomCode].moderator === socket.id;
                 delete rooms[roomCode].players[socket.id];
-                if (isModerator) {
-                    if (!rooms[roomCode].inGame) {
-                        io.to(roomCode).emit('lobbyClosed');
-                        delete rooms[roomCode];
-                    }
-                } else {
-                    io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
-                    if (Object.keys(rooms[roomCode].players).length === 0 && !rooms[roomCode].inGame) {
-                        delete rooms[roomCode];
-                        console.log(`Room ${roomCode} deleted due to inactivity.`);
-                    }
+                // Emit updated scores after removal.
+                const allScores = {};
+                for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                    allScores[playerObj.name] = playerObj.score;
+                }
+                io.to(roomCode).emit('scoresUpdated', allScores);
+
+                io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
+                if (Object.keys(rooms[roomCode].players).length === 0 && !rooms[roomCode].inGame) {
+                    delete rooms[roomCode];
+                    console.log(`Room ${roomCode} deleted due to inactivity.`);
                 }
             }
         }
@@ -288,16 +322,35 @@ io.on('connection', (socket) => {
     // RESOURCE COLLECTED
     socket.on('resourceCollected', (data) => {
         const { roomCode, resourceId, playerName } = data;
-        if (!rooms[roomCode] || !rooms[roomCode].resources) return;
-        const collected = rooms[roomCode].resources.find(r => r.id === resourceId);
-        rooms[roomCode].resources = rooms[roomCode].resources.filter(r => r.id !== resourceId);
+        const room = rooms[roomCode];
+        if (!room || !room.resources) return;
+
+        const collected = room.resources.find(r => r.id === resourceId);
+        room.resources = room.resources.filter(r => r.id !== resourceId);
         io.to(roomCode).emit('resourceRemoved', resourceId);
-        if (collected && collected.type === 'powerup') {
-            io.to(roomCode).emit('powerUpEffect', {
-                source: playerName,
-                effect: 'slow',    // e.g., a slow-down effect
-                duration: 5000     // lasts for 5 seconds
-            });
+
+        if (collected) {
+            // Determine which player collected the resource
+            const playerSocketId = Object.keys(room.players).find(id => room.players[id].name === playerName);
+            if (playerSocketId) {
+                const points = 10; // or adjust based on type
+                room.players[playerSocketId].score += points;
+            }
+
+            if (collected.type === 'powerup') {
+                io.to(roomCode).emit('powerUpEffect', {
+                    source: playerName,
+                    effect: 'slow',
+                    duration: 5000
+                });
+            }
+
+            // Build and emit updated scores
+            const allScores = {};
+            for (const [id, playerObj] of Object.entries(room.players)) {
+                allScores[playerObj.name] = playerObj.score;
+            }
+            io.to(roomCode).emit('scoresUpdated', allScores);
         }
     });
 

@@ -1,32 +1,101 @@
 /* public/styles/game.css */
-body {
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    background: #222;
+}
+body {
+    background: #1a1a1a;
     color: #eee;
-    font-family: Arial, sans-serif;
+    font-family: 'Trebuchet MS', sans-serif;
 }
 
-/* Container for the game content */
-#gameContainer {
+/* HEADER AT THE TOP */
+#header {
+    text-align: center;
+    padding: 20px;
+    background: #111;
+    border-bottom: 2px solid #444;
+}
+#header h1 {
+    color: #0ff;
+    text-shadow: 0 0 5px #0ff;
+}
+
+/* MAIN CONTENT: FLEX CONTAINER */
+#mainContent {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    height: 100vh;
+    max-width: 1400px;
+    margin: 20px auto;
+    gap: 20px; /* space between scoreboard and boardContainer */
 }
 
-/* Game board styling */
+/* SCOREBOARD PANEL */
+#scoreboard {
+    width: 250px;
+    background: #222;
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 0 10px #0ff;
+    min-height: 300px;
+}
+#scoreboard h2 {
+    margin-bottom: 10px;
+    text-align: center;
+    color: #0ff;
+    text-shadow: 0 0 3px #0ff;
+}
+#playerScores {
+    list-style: none;
+    margin-top: 10px;
+    padding-left: 0;
+}
+#playerScores li {
+    padding: 5px 0;
+    border-bottom: 1px solid #333;
+    font-size: 1.1em;
+}
+#playerScores li:last-child {
+    border-bottom: none;
+}
+
+/* BOARD CONTAINER */
+#boardContainer {
+    position: relative; /* so timer can position absolutely within */
+}
+
+/* TIMER CONTAINER */
+#timerContainer {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 5px 15px;
+    border-radius: 6px;
+    margin-top: 10px;
+    z-index: 10; /* above board */
+    font-size: 1.2em;
+}
+
+/* BOARD */
 #board {
     position: relative;
-    width: 1300px;
-    height: 1000px;
-    background: #333;
-    border: 2px solid #444;
-    margin-bottom: 20px;
+    width: 1000px;
+    height: 800px;
+    background: radial-gradient(circle at center, #000 0%, #111 100%);
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    box-shadow: 0 0 20px #0ff;
+    overflow: hidden;
+    margin-top: 50px; /* so the board doesn't overlap timer visually */
 }
 
-/* Styling for player avatars */
+/* PLAYER AVATARS */
 .avatar {
     position: absolute;
     width: 40px;
@@ -36,16 +105,47 @@ body {
     border-radius: 5px;
     color: #fff;
     font-size: 0.8em;
+    background-color: #08f;
+    box-shadow: 0 0 5px #08f;
+    z-index: 10;
 }
 
-/* In-game menu overlay */
+/* REMOTE PLAYER AVATARS */
+.remoteAvatar {
+    border: 2px solid #fff;
+    border-radius: 5px;
+    background-color: #f00;
+    box-shadow: 0 0 5px #f00;
+    width: 40px;
+    height: 40px;
+    position: absolute;
+}
+
+/* WALLS */
+.wall {
+    background-color: #666;
+    opacity: 0.8;
+    border: 1px solid #444;
+    z-index: 5;
+}
+
+/* RESOURCES */
+.resource {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: 0 0 5px #ff0;
+}
+
+/* IN-GAME MENU OVERLAY */
 #inGameMenu {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.75); /* semi-transparent background */
+    background: rgba(0, 0, 0, 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -53,29 +153,24 @@ body {
     opacity: 1;
     transition: opacity 0.3s ease;
 }
-
-/* Hidden state for the menu */
 #inGameMenu.hidden {
     opacity: 0;
     pointer-events: none;
 }
-
-/* Menu content box styling */
 .menuContent {
-    background: #333;
+    background: #222;
     padding: 20px;
-    border: 2px solid #444;
+    border: 2px solid #0ff;
+    border-radius: 10px;
     text-align: center;
     color: #fff;
-    border-radius: 10px;
+    box-shadow: 0 0 10px #0ff;
 }
-
-/* Header inside the menu */
 .menuContent h2 {
     margin-top: 0;
+    color: #0ff;
+    text-shadow: 0 0 3px #0ff;
 }
-
-/* Style for the Quit button in the menu */
 .menuContent button {
     margin: 10px;
     padding: 10px 20px;
@@ -85,37 +180,9 @@ body {
     border-radius: 5px;
     background: #555;
     color: #eee;
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
 }
-
 .menuContent button:hover {
     background: #777;
-}
-
-/* (Optional) Styling for the scoreboard if needed */
-#scoreboard {
-    font-size: 1.2em;
-    margin-top: 10px;
-}
-
-/* For resource elements */
-.resource {
-    border-radius: 50%;
-}
-
-/* Style the scoreboard and timer */
-#scoreboard, #timer {
-    font-size: 1.2em;
-    margin: 10px;
-}
-
-.remoteAvatar {
-    border: 2px solid white;
-    border-radius: 5px;
-}
-
-.wall {
-    background-color: grey;
-    opacity: 0.8;
-    border: 1px solid #444;
+    box-shadow: 0 0 5px #0ff;
 }

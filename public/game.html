@@ -3,23 +3,38 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Game Page</title>
-    <!-- Ensure game.css defines dimensions and styling for the board, inGameMenu, etc. -->
+    <title>My Multiplayer Game</title>
+
+    <!-- Game CSS for layout and style -->
     <link rel="stylesheet" href="/styles/game.css" />
+
+    <!-- Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-<div id="gameContainer">
+
+<div id="header">
     <h1>My Multiplayer Game</h1>
-    <!-- Game board: All dynamic elements (resources, walls, remote players) -->
-    <div id="board"></div>
-    <!-- Scoreboard: Shows the player's score -->
+</div>
+
+<!-- Main content container: scoreboard on the left, board+timer on the right -->
+<div id="mainContent">
+
+    <!-- Scoreboard Panel -->
     <div id="scoreboard">
-        Score: <span id="score">0</span>
+        <h2>Scores</h2>
+        <!-- We'll fill this <ul> dynamically with places/scores -->
+        <ul id="playerScores"></ul>
     </div>
-    <!-- Timer: Shows the time left (updated authoritatively by the server) -->
-    <div id="timer">
-        Time Left: <span id="timeLeft">60</span>s
+
+    <!-- Board Container (holds the timer on top + the board below) -->
+    <div id="boardContainer">
+        <!-- Timer Container: an overlay at the top-center of the board -->
+        <div id="timerContainer">
+            <span>Time Left: <span id="timeLeft">60</span>s</span>
+        </div>
+        <!-- Game board: all dynamic elements (avatars, walls, resources, etc.) go here -->
+        <div id="board"></div>
     </div>
 </div>
 
@@ -33,7 +48,7 @@
     </div>
 </div>
 
-<!-- Load the main game JS module -->
+<!-- Load the main game JS module (make sure your file path is correct) -->
 <script type="module" src="/js/game/game.js"></script>
 </body>
 </html>
