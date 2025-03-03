@@ -1,15 +1,26 @@
 # Multiplayer Web Game
 
-Welcome to the Multiplayer Web Game! This game allows 2 to 4 players to join and play in real-time using their web browsers.
+A real-time multiplayer game that supports 2-4 players competing in a resource collection challenge. Players navigate through a procedurally generated labyrinth to collect resources while competing for the highest score.
 
 ## Features
 
-- **Real-Time Multiplayer**: Supports 2 to 4 players simultaneously.
-- **DOM-Based Rendering**: Utilizes DOM elements for rendering, ensuring compatibility with browsers where the `<canvas>` element is disabled.
-- **Smooth Animations**: Maintains a consistent 60 FPS for a jank-free experience.
-- **In-Game Menu**: Includes options to pause, resume, and quit the game.
-- **Scoring System**: Real-time score updates with a dynamic scoreboard.
-- **Sound Effects**: Audio feedback for various in-game events.
+- **Real-time Multiplayer**: Supports 2-4 players joining from different browsers
+- **Smooth Performance**: Runs at 60+ FPS with proper use of `RequestAnimationFrame`
+- **DOM-based Rendering**: No HTML canvas usage, ensuring broad browser compatibility
+- **Game Mechanics**:
+    - Procedurally generated labyrinth with difficulty settings
+    - Resource collection for points
+    - Power-ups that affect other players
+    - Real-time player movement and collision detection
+- **Game Management**:
+    - Room-based game sessions with unique codes
+    - Lobby system for gathering players before starting
+    - Moderator controls for starting the game and adjusting settings
+- **In-game Features**:
+    - Pause/resume/quit functionality
+    - Real-time scoreboard showing all players' scores
+    - Game timer that counts down
+    - Player notification when others pause, resume, or quit
 
 ## Prerequisites
 
@@ -22,62 +33,59 @@ Before you begin, ensure you have the following installed:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/your-username/multiplayer-web-game.git
-   cd multiplayer-web-game
+   git clone https://gitea.kood.tech/kristjankelk/web-game.git
+   cd web-game
    ```
 
-2. **Install Dependencies**:
-
-   Navigate to the `server` directory and install the necessary Node.js packages:
-
+2. **Install dependencies**:
    ```bash
-   cd server
    npm install
    ```
 
 ## Running the Game Locally
 
-1. **Start the Server**:
-
-   In the `server` directory, start the Node.js server:
-
+1. **Start the server**:
    ```bash
-   node server.js
+   npm start
    ```
 
-   The server will run on `http://localhost:3000`.
+2. **Access the game**:
+   Open your browser and navigate to `http://localhost:3000`
 
-2. **Access the Game**:
+3. **Create or join a game**:
+    - Click "Create Game" to host a new game session
+    - Click "Join Game" and enter a room code to join an existing session
 
-   Open your web browser and navigate to `http://localhost:3000` to access the game interface.
+## Game Flow
 
-## Deployment
+1. **Lobby**: After creating or joining a game, players enter a lobby
+2. **Game Settings**: The moderator (first player) can adjust difficulty and round settings
+3. **Start Game**: The moderator starts the game when 2-4 players have joined
+4. **Gameplay**:
+    - Navigate your character using arrow keys or WASD
+    - Collect yellow resources for points
+    - Purple power-ups slow down opponents
+    - Avoid walls in the labyrinth
+5. **Game Over**: The player with the highest score when the timer ends wins
 
-To make the game accessible to others over the internet, consider deploying it using a hosting service like [Render](https://render.com/), [Railway](https://railway.app/), or [Vercel](https://vercel.com/). Ensure that the server is publicly accessible and that you've configured the deployment settings appropriately.
+Game is accessible to others over the internet https://web-game-vycg.onrender.com/
 
 ## Project Structure
 
 ```
-/multiplayer-web-game
-├── /public
-│   ├── index.html
-│   ├── styles.css
-│   └── script.js
-└── /server
-    ├── server.js
-    └── package.json
+/web-game
+├── /public            # Client-side files
+│   ├── /js            # JavaScript modules
+│   │   ├── /game      # Game-specific logic
+│   │   │   ├── game.js       # Main game logic
+│   │   │   ├── player.js     # Player class
+│   │   │   └── resource.js   # Resource management
+│   │   ├── landing.js  # Landing page logic
+│   │   └── lobby.js    # Lobby management
+│   ├── /styles        # CSS stylesheets
+│   ├── game.html      # Game page
+│   ├── index.html     # Landing page
+│   └── lobby.html     # Lobby page
+└── /server            # Server-side files
+    └── server.js      # Express server and Socket.IO logic
 ```
-
-- **`/public`**: Contains the client-side files.
-    - `index.html`: The main HTML file.
-    - `styles.css`: CSS for styling.
-    - `script.js`: Client-side JavaScript.
-- **`/server`**: Contains the server-side files.
-    - `server.js`: The Express server setup.
-    - `package.json`: Lists Node.js dependencies.
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and create a pull request with your changes.
-
-
