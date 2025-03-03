@@ -22,6 +22,18 @@ A real-time multiplayer game that supports 2-4 players competing in a resource c
     - Game timer that counts down
     - Player notification when others pause, resume, or quit
 
+## How to play
+
+- Be prepared to have fun while also making strategic choices.
+- Using F11 for a full screen mode gets you more immersed and gives a better experience - recommended.
+- Esc lets you exit or resume the game.
+- Figure out your colored square and move it by AWSD or keyboard arrows.
+- Collect resources and earn points - be warned that whoever collects the purple resource instead of yellow will make their opponents twice as slow for a period of time.
+- Maps and labyrynths are random and resources appear in random places.
+- Do not be surprised if you cannot access the whole map with some labyrynths - as in life, all does not always go according to plan and you just have to deal with it.
+- Your movable square is also not perfeclty aligned to the maps and labyrynths - have fun figuring out the most optimal moves due to that, because the shortest path is not always the fastest way to a resource.
+- Hint: observe your opponents.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
