@@ -231,11 +231,18 @@ io.on('connection', (socket) => {
         }
         rooms[roomCode].inGame = true;
         rooms[roomCode].startTime = Date.now();
+        rooms[roomCode].pausedAt = null;
+        rooms[roomCode].totalPausedTime = 0;
+        rooms[roomCode].paused = false;
         rooms[roomCode].duration = 60 * 1000; // 60 seconds
 
         rooms[roomCode].timerInterval = setInterval(() => {
-            const elapsed = Date.now() - rooms[roomCode].startTime;
-            let timeLeft = Math.max(0, Math.floor((rooms[roomCode].duration - elapsed) / 1000));
+            // Skip timer updates if game is paused
+            if (rooms[roomCode].paused) return;
+
+            const currentTime = Date.now();
+            const adjustedElapsed = currentTime - rooms[roomCode].startTime - rooms[roomCode].totalPausedTime;
+            let timeLeft = Math.max(0, Math.floor((rooms[roomCode].duration - adjustedElapsed) / 1000));
             io.to(roomCode).emit('timeUpdate', timeLeft);
             if (timeLeft <= 0) {
                 clearInterval(rooms[roomCode].timerInterval);
@@ -365,9 +372,16 @@ io.on('connection', (socket) => {
         switch (action) {
             case 'pause':
                 rooms[roomCode].paused = true;
+                rooms[roomCode].pausedAt = Date.now();
                 io.to(roomCode).emit('gamePaused', { message: `${playerName} paused the game.` });
                 break;
             case 'resume':
+                if (rooms[roomCode].paused && rooms[roomCode].pausedAt) {
+                    // Calculate how long the game was paused and add to total paused time
+                    const pauseDuration = Date.now() - rooms[roomCode].pausedAt;
+                    rooms[roomCode].totalPausedTime += pauseDuration;
+                    rooms[roomCode].pausedAt = null;
+                }
                 rooms[roomCode].paused = false;
                 io.to(roomCode).emit('gameResumed', { message: `${playerName} resumed the game.` });
                 break;
@@ -389,6 +403,7 @@ io.on('connection', (socket) => {
                 break;
         }
     });
+
 });
 
 server.listen(PORT, () => {
