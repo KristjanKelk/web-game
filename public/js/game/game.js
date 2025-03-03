@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // DOM references
     const board = document.getElementById('board');
-    const scoreboard = document.getElementById('scoreboard'); // container for scoreboard
-    const timerDisplay = document.getElementById('timeLeft');
+    //const scoreboard = document.getElementById('scoreboard'); // container for scoreboard
+    //const timerDisplay = document.getElementById('timeLeft');
 
     // In-game menu elements
     const inGameMenu = document.getElementById('inGameMenu');
@@ -106,9 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return false;
     }
-    // -------------------------
-    // End Wall Handling
-    // -------------------------
 
     /**
      * Track keys pressed so we can compute velocity each frame.
@@ -168,7 +165,42 @@ document.addEventListener('DOMContentLoaded', () => {
      * Main game loop: updates the local player's movement,
      * checks for collisions, and emits position updates.
      */
-    function gameLoop() {
+    // FPS counter
+    const fpsMeter = document.createElement('div');
+    fpsMeter.style.position = 'fixed';
+    fpsMeter.style.top = '10px';
+    fpsMeter.style.right = '10px';
+    fpsMeter.style.background = 'rgba(0, 0, 0, 0.7)';
+    fpsMeter.style.color = '#0f0';
+    fpsMeter.style.padding = '5px 10px';
+    fpsMeter.style.borderRadius = '5px';
+    fpsMeter.style.fontFamily = 'monospace';
+    fpsMeter.style.zIndex = '1000';
+    document.body.appendChild(fpsMeter);
+
+    let frameCount = 0;
+    let lastFpsUpdateTime = 0;
+    let lastFrameTime = performance.now();
+
+    function gameLoop(timestamp) {
+        // Calculate FPS
+        const deltaTime = timestamp - lastFrameTime;
+        lastFrameTime = timestamp;
+
+        frameCount++;
+
+        // Updates FPS every half second
+        if (timestamp - lastFpsUpdateTime > 500) {
+            const fps = Math.round((frameCount * 1000) / (timestamp - lastFpsUpdateTime));
+            fpsMeter.textContent = `${fps} FPS`;
+
+            // IF Fps is below 60 it turns red
+            fpsMeter.style.color = fps >= 60 ? '#0f0' : '#f00';
+
+            frameCount = 0;
+            lastFpsUpdateTime = timestamp;
+        }
+
         if (!gamePaused) {
             let vx = 0, vy = 0;
             if (keysDown.up) vy -= player.speed;
@@ -176,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (keysDown.left) vx -= player.speed;
             if (keysDown.right) vx += player.speed;
 
-            player.setVelocity(vx, vy);
+            player.setVelocity(vx * (deltaTime / 16.67), vy * (deltaTime / 16.67));
             const previousPosition = { ...player.position };
             player.update();
 
