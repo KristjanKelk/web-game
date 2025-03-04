@@ -15,7 +15,7 @@ const gameSettingsPanel = document.getElementById('gameSettingsPanel');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const settingsErrorMsg = document.getElementById('settingsErrorMsg');
 const difficultySelect = document.getElementById('difficultySelect');
-const roundsInput = document.getElementById('roundsInput');
+//const roundsInput = document.getElementById('roundsInput');
 
 // Displayed for everyone (read-only)
 const displaySettingsDiv = document.getElementById('displaySettings');
@@ -90,7 +90,7 @@ saveSettingsBtn.addEventListener('click', () => {
 
     const newSettings = {
         difficulty: difficultySelect.value,
-        rounds: parseInt(roundsInput.value, 10) || 1
+        //rounds: parseInt(roundsInput.value, 10) || 1
     };
 
     // Send to server
