@@ -186,3 +186,111 @@ body {
     background: #777;
     box-shadow: 0 0 5px #0ff;
 }
+
+/* VICTORY SCREEN */
+#victoryScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1s ease;
+}
+
+#victoryScreen.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.victoryContent {
+    text-align: center;
+    padding: 40px;
+    background: #222;
+    border: 3px solid #0ff;
+    border-radius: 15px;
+    box-shadow: 0 0 30px #0ff, inset 0 0 20px rgba(0, 255, 255, 0.3);
+    max-width: 80%;
+}
+
+.victoryContent h2 {
+    font-size: 2.5em;
+    color: #0ff;
+    text-shadow: 0 0 10px #0ff;
+    margin-bottom: 20px;
+    animation: pulse 2s infinite;
+}
+
+.victoryContent .winner {
+    font-size: 3em;
+    color: gold;
+    text-shadow: 0 0 15px gold;
+    margin: 30px 0;
+    font-weight: bold;
+}
+
+.victoryContent .score {
+    font-size: 1.5em;
+    color: #fff;
+    margin-bottom: 30px;
+}
+
+.victoryContent .tiedPlayers {
+    margin: 20px 0;
+}
+
+.victoryContent .tiedPlayers span {
+    color: gold;
+    font-weight: bold;
+    text-shadow: 0 0 5px gold;
+}
+
+.victoryContent button {
+    padding: 12px 30px;
+    font-size: 1.2em;
+    background: #0ff;
+    color: #000;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+}
+
+.victoryContent button:hover {
+    background: #fff;
+    box-shadow: 0 0 15px #0ff;
+    transform: scale(1.05);
+}
+
+/* Animation for the pulsing effect */
+@keyframes pulse {
+    0% { text-shadow: 0 0 10px #0ff; }
+    50% { text-shadow: 0 0 20px #0ff, 0 0 30px #0ff; }
+    100% { text-shadow: 0 0 10px #0ff; }
+}
+
+/* Confetti animation for the winner */
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: #0ff;
+    opacity: 0.7;
+    animation: fall 5s linear infinite;
+}
+
+@keyframes fall {
+    0% {
+        transform: translateY(-100vh) rotate(0deg);
+    }
+    100% {
+        transform: translateY(100vh) rotate(360deg);
+    }
+}

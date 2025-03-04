@@ -246,7 +246,41 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('timeUpdate', timeLeft);
             if (timeLeft <= 0) {
                 clearInterval(rooms[roomCode].timerInterval);
-                io.to(roomCode).emit('gameOver', { message: 'Time is up! Game over.' });
+
+                let highestScore = -1;
+                let winner = null;
+
+                for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                    if (playerObj.score > highestScore) {
+                        highestScore = playerObj.score;
+                        winner = playerObj.name;
+                    }
+                }
+
+                let isTie = false;
+                let tiedPlayers = [];
+                for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                    if (playerObj.score === highestScore && playerObj.name !== winner) {
+                        isTie = true;
+                        tiedPlayers.push(playerObj.name);
+                    }
+                }
+
+                if (isTie) {
+                    tiedPlayers.push(winner);
+                    io.to(roomCode).emit('gameOver', {
+                        message: 'Game over! It\'s a tie!',
+                        isTie: true,
+                        tiedPlayers: tiedPlayers,
+                        highestScore: highestScore
+                    });
+                } else {
+                    io.to(roomCode).emit('gameOver', {
+                        message: 'Game over!',
+                        winner: winner,
+                        score: highestScore
+                    });
+                }
             }
         }, 1000);
 

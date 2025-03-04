@@ -262,9 +262,78 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('gameOver', (data) => {
-        alert(data.message);
-        window.location.href = '/';
+        console.log("Received gameOver event:", data);
+
+        const victoryScreen = document.getElementById('victoryScreen');
+        const winnerContent = document.getElementById('winnerContent');
+        const returnToLobbyBtn = document.getElementById('returnToLobbyBtn');
+
+        winnerContent.innerHTML = '';
+
+        if (data.isTie) {
+            // It's a tie
+            const tieMessage = document.createElement('div');
+            tieMessage.className = 'winner';
+            tieMessage.textContent = "IT'S A TIE!";
+            winnerContent.appendChild(tieMessage);
+
+            const tiedPlayers = document.createElement('div');
+            tiedPlayers.className = 'tiedPlayers';
+            tiedPlayers.innerHTML = 'Between: <br>' + data.tiedPlayers.map(name => `<span>${name}</span>`).join(', ');
+            winnerContent.appendChild(tiedPlayers);
+
+            const score = document.createElement('div');
+            score.className = 'score';
+            score.textContent = `Score: ${data.highestScore}`;
+            winnerContent.appendChild(score);
+        } else {
+            const winnerName = document.createElement('div');
+            winnerName.className = 'winner';
+            winnerName.textContent = data.winner;
+            winnerContent.appendChild(winnerName);
+
+            const winnerLabel = document.createElement('div');
+            winnerLabel.textContent = 'is the WINNER!';
+            winnerContent.appendChild(winnerLabel);
+
+            const score = document.createElement('div');
+            score.className = 'score';
+            score.textContent = `Score: ${data.score}`;
+            winnerContent.appendChild(score);
+
+            createConfetti();
+        }
+
+        setTimeout(() => {
+            victoryScreen.classList.add('visible');
+        }, 500);
+
+        returnToLobbyBtn.addEventListener('click', () => {
+            window.location.href = '/';
+        });
     });
+
+    // Add a function to create confetti effect
+    function createConfetti() {
+        const container = document.querySelector('.victoryContent');
+        const colors = ['#0ff', '#ff0', '#f0f', '#0f0', '#fff'];
+
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + '%';
+            confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+            confetti.style.animationDelay = Math.random() * 5 + 's';
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+            // Randomize the size
+            const size = Math.random() * 10 + 5;
+            confetti.style.width = size + 'px';
+            confetti.style.height = size + 'px';
+
+            document.body.appendChild(confetti);
+        }
+    }
 
     resumeBtn.addEventListener('click', () => {
         console.log("Resume button clicked. Emitting resume action.");
