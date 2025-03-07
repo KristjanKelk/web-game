@@ -199,3 +199,15 @@ h2, h3 {
     color: #0ff;
     font-weight: bold;
 }
+
+.single-player-btn, .multi-player-btn {
+    margin-top: 20px;
+    padding: 12px 25px;
+    font-size: 1.1em;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #eee;
+    transition: background 0.3s, box-shadow 0.3s;
+    font-weight: bold;
+}
