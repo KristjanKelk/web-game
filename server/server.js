@@ -395,7 +395,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // GAME ACTION (pause, resume, quit)
+    // GAME ACTION (pause, resume, quit, restart)
     socket.on('gameAction', (data) => {
         const { roomCode, action, playerName } = data;
         console.log(`Server received gameAction: ${action} from ${playerName} for room ${roomCode}`);
@@ -418,6 +418,88 @@ io.on('connection', (socket) => {
                 }
                 rooms[roomCode].paused = false;
                 io.to(roomCode).emit('gameResumed', { message: `${playerName} resumed the game.` });
+                break;
+            case 'restart':
+                console.log(`${playerName} requested to restart the game in room ${roomCode}`);
+
+                for (const playerId in rooms[roomCode].players) {
+                    rooms[roomCode].players[playerId].score = 0;
+                }
+
+                rooms[roomCode].resources = [];
+                if (rooms[roomCode].timerInterval) {
+                    clearInterval(rooms[roomCode].timerInterval);
+                }
+
+                rooms[roomCode].inGame = true;
+                rooms[roomCode].startTime = Date.now();
+                rooms[roomCode].pausedAt = null;
+                rooms[roomCode].totalPausedTime = 0;
+                rooms[roomCode].paused = false;
+                rooms[roomCode].duration = 60 * 1000;
+
+                const difficulty = (rooms[roomCode].settings.difficulty || 'Easy').toLowerCase();
+                const labyrinthLayout = generateLabyrinth(difficulty);
+                rooms[roomCode].labyrinthLayout = labyrinthLayout;
+                io.to(roomCode).emit('labyrinthLayout', labyrinthLayout);
+
+                const resetScores = {};
+                for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                    resetScores[playerObj.name] = 0;
+                }
+
+                io.to(roomCode).emit('gameRestart', {
+                    message: `${playerName} restarted the game.`,
+                    resetScores: resetScores
+                });
+
+                rooms[roomCode].timerInterval = setInterval(() => {
+                    if (rooms[roomCode].paused) return;
+
+                    const currentTime = Date.now();
+                    const adjustedElapsed = currentTime - rooms[roomCode].startTime - rooms[roomCode].totalPausedTime;
+                    let timeLeft = Math.max(0, Math.floor((rooms[roomCode].duration - adjustedElapsed) / 1000));
+                    io.to(roomCode).emit('timeUpdate', timeLeft);
+                    if (timeLeft <= 0) {
+                        clearInterval(rooms[roomCode].timerInterval);
+
+                        let highestScore = -1;
+                        let winner = null;
+
+                        for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                            if (playerObj.score > highestScore) {
+                                highestScore = playerObj.score;
+                                winner = playerObj.name;
+                            }
+                        }
+
+                        let isTie = false;
+                        let tiedPlayers = [];
+                        for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
+                            if (playerObj.score === highestScore && playerObj.name !== winner) {
+                                isTie = true;
+                                tiedPlayers.push(playerObj.name);
+                            }
+                        }
+
+                        if (isTie) {
+                            tiedPlayers.push(winner);
+                            io.to(roomCode).emit('gameOver', {
+                                message: 'Game over! It\'s a tie!',
+                                isTie: true,
+                                tiedPlayers: tiedPlayers,
+                                highestScore: highestScore
+                            });
+                        } else {
+                            io.to(roomCode).emit('gameOver', {
+                                message: 'Game over!',
+                                winner: winner,
+                                score: highestScore
+                            });
+                        }
+                    }
+                }, 1000);
+
                 break;
             case 'quit':
                 if (rooms[roomCode].moderator !== socket.id) {

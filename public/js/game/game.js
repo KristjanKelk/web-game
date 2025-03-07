@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // In-game menu elements
     const inGameMenu = document.getElementById('inGameMenu');
     const resumeBtn = document.getElementById('resumeBtn');
+    const restartBtn = document.getElementById('restartBtn');
     const quitBtn = document.getElementById('quitBtn');
     const menuMessage = document.getElementById('menuMessage');
 
@@ -339,6 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Resume button clicked. Emitting resume action.");
         socket.emit('gameAction', { roomCode, action: 'resume', playerName });
     });
+    restartBtn.addEventListener('click', () => {
+        console.log("Restart button clicked. Emitting restart action.");
+        socket.emit('gameAction', { roomCode, action: 'restart', playerName });
+    });
     quitBtn.addEventListener('click', () => {
         console.log("Quit button clicked. Emitting quit action.");
         socket.emit('gameAction', { roomCode, action: 'quit', playerName });
@@ -392,6 +397,22 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('playerLeft', (data) => {
         console.log("Received playerLeft event:", data);
         menuMessage.textContent = data.message;
+    });
+
+    socket.on('gameRestart', (data) => {
+        console.log("Received gameRestart event:", data);
+
+        resourceManager.clearResources();
+        menuMessage.textContent = data.message;
+
+        updatePlayerScores(data.resetScores);
+
+        const timeSpan = document.getElementById('timeLeft');
+        if (timeSpan) timeSpan.textContent = "60";
+
+        setTimeout(() => inGameMenu.classList.add('hidden'), 2000);
+
+        gamePaused = false;
     });
 
     // Remote players: update their positions as received.
