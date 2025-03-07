@@ -102,7 +102,7 @@ function spawnResourceForRoom(roomCode) {
         return;
     }
 
-    const isPowerUp = Math.random() < 0.2;
+    const isPowerUp = Math.random() < 0.05;
     const resource = {
         id: Math.random().toString(36).substr(2, 9),
         left: candidateX,
@@ -116,23 +116,37 @@ function spawnResourceForRoom(roomCode) {
     rooms[roomCode].resources.push(resource);
     io.to(roomCode).emit('resourceSpawned', resource);
 
-    // Remove resource after 10 seconds if not collected.
+    const timeoutDuration = 6000 + Math.floor(Math.random() * 4000);
     setTimeout(() => {
         if (rooms[roomCode] && rooms[roomCode].resources) {
             rooms[roomCode].resources = rooms[roomCode].resources.filter(r => r.id !== resource.id);
             io.to(roomCode).emit('resourceRemoved', resource.id);
+
+            if (rooms[roomCode].resources.length < 3) {
+                spawnResourceForRoom(roomCode);
+            }
         }
-    }, 10000);
+    }, timeoutDuration);
 }
 
-// Spawn resources every 5 seconds for rooms that are in game.
+// Spawn resources every 1 second for rooms that are in game.
 setInterval(() => {
     for (const roomCode in rooms) {
         if (rooms[roomCode].inGame) {
-            spawnResourceForRoom(roomCode);
+            const numResourcesToSpawn = Math.floor(Math.random() * 3) + 1;
+            for (let i = 0; i < numResourcesToSpawn; i++) {
+                spawnResourceForRoom(roomCode);
+            }
+
+            if (rooms[roomCode].resources && rooms[roomCode].resources.length < 5) {
+                const additionalNeeded = 5 - rooms[roomCode].resources.length;
+                for (let i = 0; i < additionalNeeded; i++) {
+                    spawnResourceForRoom(roomCode);
+                }
+            }
         }
     }
-}, 5000);
+}, 1000);
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -151,7 +165,7 @@ io.on('connection', (socket) => {
             inGame: false,
             resources: [],
             positions: {},
-            labyrinthLayout: []  // Will be set when game starts.
+            labyrinthLayout: []
         };
         socket.emit('gameCreated', { roomCode });
     });
@@ -176,14 +190,12 @@ io.on('connection', (socket) => {
             room.moderator = socket.id;
         }
 
-        // Add player with initial score 0.
         room.players[socket.id] = { name: playerName, score: 0 };
 
         socket.join(roomCode);
-        // Emit the updated player list (if needed elsewhere)
+
         io.to(roomCode).emit('updatePlayerList', Object.values(room.players));
 
-        // Build a scores object and emit it.
         const allScores = {};
         for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
             allScores[playerObj.name] = playerObj.score;
@@ -203,18 +215,16 @@ io.on('connection', (socket) => {
         }
         socket.join(roomCode);
 
-        // If the player is not already in the room, add them with an initial score of 0.
         if (!rooms[roomCode].players[socket.id]) {
             rooms[roomCode].players[socket.id] = { name: playerName, score: 0 };
         }
 
         console.log(`Player ${playerName} joined game state for room ${roomCode}`);
 
-        // If the game is in progress and a labyrinth layout exists, send it.
         if (rooms[roomCode].inGame && rooms[roomCode].labyrinthLayout.length > 0) {
             socket.emit('labyrinthLayout', rooms[roomCode].labyrinthLayout);
         }
-        // Build and emit current scores to the joining socket.
+
         const allScores = {};
         for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
             allScores[playerObj.name] = playerObj.score;
@@ -284,7 +294,6 @@ io.on('connection', (socket) => {
             }
         }, 1000);
 
-        // Generate labyrinth layout based on the room's difficulty.
         const difficulty = (rooms[roomCode].settings.difficulty || 'Easy').toLowerCase();
         const labyrinthLayout = generateLabyrinth(difficulty);
         rooms[roomCode].labyrinthLayout = labyrinthLayout;
