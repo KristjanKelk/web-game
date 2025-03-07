@@ -60,20 +60,24 @@ socket.on('updatePlayerList', (players) => {
         playersList.appendChild(li);
     });
 
-    // Check if *I* am the moderator
     const amIModerator = (players.length > 0 && players[0].name === playerName);
 
     // Show button only if I'm the moderator
     startButton.style.display = amIModerator ? 'inline-block' : 'none';
 
-    // Update button text and style based on player count
     if (amIModerator) {
-        if (players.length === 1) {
-            startButton.textContent = 'Start Single-Player Game';
-            startButton.className = 'single-player-btn';
+        startButton.textContent = 'Start Multiplayer Game';
+        startButton.className = 'multi-player-btn';
+
+        // Disable button if fewer than 2 players
+        if (players.length < 2) {
+            startButton.disabled = true;
+            startButton.title = 'At least 2 players are required to start';
+            startButton.classList.add('disabled-btn');
         } else {
-            startButton.textContent = 'Start Multiplayer Game';
-            startButton.className = 'multi-player-btn';
+            startButton.disabled = false;
+            startButton.title = '';
+            startButton.classList.remove('disabled-btn');
         }
     }
 

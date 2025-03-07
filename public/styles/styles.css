@@ -200,7 +200,7 @@ h2, h3 {
     font-weight: bold;
 }
 
-.single-player-btn, .multi-player-btn {
+.multi-player-btn {
     margin-top: 20px;
     padding: 12px 25px;
     font-size: 1.1em;
@@ -210,4 +210,21 @@ h2, h3 {
     color: #eee;
     transition: background 0.3s, box-shadow 0.3s;
     font-weight: bold;
+    background: #1a6b1a;
+}
+
+.multi-player-btn:hover {
+    background: #238023;
+    box-shadow: 0 0 10px #0ff;
+}
+
+.disabled-btn {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #555 !important;
+}
+
+.disabled-btn:hover {
+    background: #555 !important;
+    box-shadow: none !important;
 }

@@ -239,6 +239,12 @@ io.on('connection', (socket) => {
             socket.emit('startError', 'Only the moderator can start the game.');
             return;
         }
+        // Add check for minimum 2 players
+        if (Object.keys(rooms[roomCode].players).length < 2) {
+            socket.emit('startError', 'At least 2 players are required to start the game.');
+            return;
+        }
+
         rooms[roomCode].inGame = true;
         rooms[roomCode].startTime = Date.now();
         rooms[roomCode].pausedAt = null;
