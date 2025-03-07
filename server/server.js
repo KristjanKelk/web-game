@@ -176,7 +176,18 @@ io.on('connection', (socket) => {
             socket.emit('joinError', 'Room does not exist.');
             return;
         }
+
         const room = rooms[roomCode];
+
+        if (room.inGame) {
+            const isExistingPlayer = Object.values(room.players).some(p => p.name === playerName);
+
+            if (!isExistingPlayer) {
+                socket.emit('joinError', 'Game already in progress. Cannot join now.');
+                return;
+            }
+        }
+
         if (Object.keys(room.players).length >= 5) {
             socket.emit('joinError', 'Room is full (max 5).');
             return;
