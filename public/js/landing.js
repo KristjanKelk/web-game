@@ -20,6 +20,21 @@ const joinRoomCodeInput = document.getElementById('joinRoomCode');
 const joinNameInput = document.getElementById('joinNameInput');
 const joinErrorMsg = document.getElementById('joinErrorMsg');
 
+// to hide join game
+const gameModeRadios = document.querySelectorAll('input[name="gameMode"]');
+
+gameModeRadios.forEach(radio => {
+
+    radio.addEventListener('change', (event) => {
+        if (event.target.value === "singleplayer") {
+            joinGameBtn.style.display = "none";
+        } else {
+            joinGameBtn.style.display = "inline-block";
+        }
+    });
+    
+});
+
 // Toggle dialogs when buttons are clicked
 createGameBtn.addEventListener('click', () => {
 
