@@ -22,8 +22,18 @@ const joinErrorMsg = document.getElementById('joinErrorMsg');
 
 // Toggle dialogs when buttons are clicked
 createGameBtn.addEventListener('click', () => {
-    createGameDialog.style.display = 'block';
-    joinGameDialog.style.display = 'none';
+
+    const gameMode = document.querySelector('input[name="gameMode"]:checked').value;
+    
+    if (gameMode === "singleplayer") {
+        // Directly move to the lobby with single-player mode
+        window.location.href = "/lobby.html?mode=singleplayer";
+    } else {
+        // Show the multiplayer create game form
+        createGameDialog.style.display = 'block';
+        joinGameDialog.style.display = 'none';
+    }
+
 });
 
 joinGameBtn.addEventListener('click', () => {
@@ -55,8 +65,9 @@ socket.on('gameCreated', (data) => {
     localStorage.setItem('roomCode', data.roomCode);
     localStorage.setItem('playerName', createNameInput.value.trim());
     localStorage.setItem('gameName', gameNameInput.value.trim());
-    // Move to the lobby page
-    window.location.href = '/lobby.html';
+
+    // Move to the lobby page, but also consider the mode
+    window.location.href = "/lobby.html?mode=multiplayer";
 });
 
 // Join game form submission

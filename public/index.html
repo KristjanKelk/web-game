@@ -8,8 +8,18 @@
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+
 <div id="container">
+
     <h1>Resource Rush</h1>
+
+    <label>
+        <input type="radio" name="gameMode" value="multiplayer" checked> Multiplayer
+    </label>
+    <label>
+        <input type="radio" name="gameMode" value="singleplayer"> Single Player (vs NPCs)
+    </label>
+
     <div id="menuButtons">
         <button id="createGameBtn">Create Game</button>
         <button id="joinGameBtn">Join Game</button>
@@ -42,7 +52,10 @@
         <button id="cancelJoin">Cancel</button>
         <p id="joinErrorMsg" class="error"></p>
     </div>
+
 </div>
+
 <script src="/js/landing.js"></script>
+
 </body>
 </html>

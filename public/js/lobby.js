@@ -1,6 +1,8 @@
 // public/js/lobby.js
 const socket = io();
 
+const urlParams = new URLSearchParams(window.location.search);
+const gameMode = urlParams.get('mode');
 const roomCode = localStorage.getItem('roomCode');
 const playerName = localStorage.getItem('playerName');
 
@@ -20,21 +22,104 @@ const difficultySelect = document.getElementById('difficultySelect');
 // Displayed for everyone (read-only)
 const displaySettingsDiv = document.getElementById('displaySettings');
 const displayDifficulty = document.getElementById('displayDifficulty');
-const displayRounds = document.getElementById('displayRounds');
+// const displayRounds = document.getElementById('displayRounds'); // no rounds really
 
-// Validate roomCode and playerName
-if (!roomCode || !playerName) {
-    lobbyErrorMsg.textContent = 'Room Code or Player Name missing. Redirecting...';
-    setTimeout(() => {
-        window.location.href = '/';
-    }, 3000);
-} else {
-    roomInfo.textContent = `Room Code: ${roomCode}`;
-    // Join the lobby
-    socket.emit('joinGame', { roomCode, playerName });
-}
+document.addEventListener('DOMContentLoaded', () => {
 
-// Handle join errors from server
+    if (gameMode === 'singleplayer') {
+
+        console.log("Single-player mode detected. setting it up");
+
+        // don't need this
+        startButton.style.display = "block"; 
+        gameSettingsPanel.style.display = "none";
+        leaveLobbyButton.textContent = "Exit to Menu";
+
+        const botConfigDiv = document.createElement("div");
+
+        // injection for this single player stuff
+        botConfigDiv.innerHTML = `
+            <h3>Single Player Configuration</h3>
+
+            <label>Game Difficulty (Map + Environment):</label>
+            <select id="gameDifficulty">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+
+            <h3>Opponent Bots</h3>
+
+            <div id="botSettings">
+                <div>
+                    <label>Bot 1:</label>
+                    <select id="bot1">
+                        <option value="none">None</option>
+                        <option value="1">Level 1 (Random Movement)</option>
+                        <option value="2">Level 2 (Chases Resources)</option>
+                        <option value="3">Level 3 (Strategic Movement)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Bot 2:</label>
+                    <select id="bot2">
+                        <option value="none">None</option>
+                        <option value="1">Level 1 (Random Movement)</option>
+                        <option value="2">Level 2 (Chases Resources)</option>
+                        <option value="3">Level 3 (Strategic Movement)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Bot 3:</label>
+                    <select id="bot3">
+                        <option value="none">None</option>
+                        <option value="1">Level 1 (Random Movement)</option>
+                        <option value="2">Level 2 (Chases Resources)</option>
+                        <option value="3">Level 3 (Strategic Movement)</option>
+                    </select>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('container').appendChild(botConfigDiv);
+
+    } else {
+
+        console.log("multiplyer mode detected. no changes");
+
+        if (!roomCode || !playerName) {
+
+            lobbyErrorMsg.textContent = 'Room Code or Player Name missing. Redirecting...';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 3000);
+
+        } else {
+
+            roomInfo.textContent = `Room Code: ${roomCode}`;
+            socket.emit('joinGame', { roomCode, playerName });
+
+        }
+    }
+
+});
+
+// ajdusted start
+startButton.addEventListener('click', () => {
+
+    if (gameMode === 'singleplayer') {
+        const botCount = document.getElementById('botCount').value;
+        const difficulty = document.getElementById('gameDifficulty').value;
+
+        window.location.href = `game.html?mode=singleplayer&bots=${botCount}&difficulty=${difficulty}`;
+    } else {
+        socket.emit('startGame');
+    }
+
+});
+
 socket.on('joinError', (msg) => {
     lobbyErrorMsg.textContent = msg;
     setTimeout(() => {
@@ -42,7 +127,6 @@ socket.on('joinError', (msg) => {
     }, 3000);
 });
 
-// Update the player list
 socket.on('updatePlayerList', (players) => {
     playersList.innerHTML = '';
 
@@ -60,32 +144,28 @@ socket.on('updatePlayerList', (players) => {
         playersList.appendChild(li);
     });
 
-    // Check if *I* am the moderator
     const amIModerator = (players.length > 0 && players[0].name === playerName);
 
-    // Show "Start Game" only if I'm the moderator
     startButton.style.display = amIModerator ? 'inline-block' : 'none';
 
-    // Show the settings panel only if I'm the moderator
     gameSettingsPanel.style.display = amIModerator ? 'block' : 'none';
-    // Show the read-only display for everyone
     displaySettingsDiv.style.display = 'block';
+
 });
 
-// Listen for updated settings from the server
 socket.on('settingsUpdated', (settings) => {
-    // Update the read-only display
+
     displayDifficulty.textContent = settings.difficulty;
     displayRounds.textContent = settings.rounds;
+
 });
 
-// If there's an error updating settings
 socket.on('settingsError', (msg) => {
     settingsErrorMsg.textContent = msg;
 });
 
-// Moderator clicks "Save Settings"
 saveSettingsBtn.addEventListener('click', () => {
+
     settingsErrorMsg.textContent = ''; // clear old error
 
     const newSettings = {
@@ -93,11 +173,11 @@ saveSettingsBtn.addEventListener('click', () => {
         //rounds: parseInt(roundsInput.value, 10) || 1
     };
 
-    // Send to server
     socket.emit('updateGameSettings', {
         roomCode,
         settings: newSettings
     });
+
 });
 
 // Start button in the lobby (only visible to moderator)
@@ -105,31 +185,20 @@ startButton.addEventListener('click', () => {
     socket.emit('startGame', roomCode);
 });
 
-// When the server emits 'gameStarted', redirect all players:
 socket.on('gameStarted', () => {
-    // Optionally store any final data you need in localStorage:
-    // localStorage.setItem('someKey', JSON.stringify(yourData));
-
-    // Redirect to the actual game page
     window.location.href = '/game.html';
 });
 
-// Listen for "lobbyClosed" event (means moderator left or disconnected)
 socket.on('lobbyClosed', () => {
+
     alert('The lobby has been closed by the moderator.');
     window.location.href = '/';
+
 });
 
-// Handle user clicking "Leave Lobby"
 leaveLobbyButton.addEventListener('click', () => {
-    // Emit leave event
-    socket.emit('leaveLobby', roomCode);
 
-    // Non-moderator will be removed from the room. We can
-    // immediately redirect them. The server will handle
-    // the rest.
-    // For the moderator, the server will broadcast 'lobbyClosed',
-    // which triggers *all* players to redirect. The moderator
-    // can either rely on that, or just do an immediate redirect too:
+    socket.emit('leaveLobby', roomCode);
     window.location.href = '/';
+
 });

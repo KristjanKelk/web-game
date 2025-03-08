@@ -82,8 +82,27 @@ document.addEventListener('DOMContentLoaded', () => {
             player.position = { x: board.clientWidth / 2, y: board.clientHeight / 2 };
             player.update();
         }
+
+        ensureSafeSpawn(player); // clena up walls
     });
 
+    function ensureSafeSpawn(player) {
+        let attempts = 0;
+        while (checkWallCollision(player) && attempts < 10) {
+            
+            console.log("Player spawn in wall detected, repositioning...");
+            player.position = {
+                x: board.clientWidth / 2 + (Math.random() * 40 - 20), // Slightly randomized center
+                y: board.clientHeight / 2 + (Math.random() * 40 - 20)
+            };
+            player.update();
+            attempts++;
+        }
+
+        if (attempts >= 10) {
+            console.warn("Failed to find a completely safe spawn after 10 attempts.");
+        }
+    }
 
     function checkWallCollision(player) {
         const avatarX = player.position.x;
