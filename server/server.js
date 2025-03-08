@@ -15,8 +15,6 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/../public/index.html');
 });
 
-// Object to hold active rooms
-// Each room: { moderator, players, settings, inGame, startTime, duration, timerInterval, resources, positions, labyrinthLayout }
 const rooms = {};
 
 // Utility to generate a random 6-character room code
@@ -24,16 +22,15 @@ function generateRoomCode() {
     return Math.random().toString(36).substr(2, 6).toUpperCase();
 }
 
-// Function to generate a labyrinth layout based on difficulty for a 1300x1000 board.
 function generateLabyrinth(difficulty) {
     const boardWidth = 1300;
     const boardHeight = 1000;
     const cols = 26;
     const rows = 20;
-    const cellWidth = boardWidth / cols;  // 50px
-    const cellHeight = boardHeight / rows;  // 50px
+    const cellWidth = boardWidth / cols;
+    const cellHeight = boardHeight / rows;
 
-    let wallProbability = 0.2; // Default for Easy
+    let wallProbability = 0.2;
     if (difficulty === 'hard') {
         wallProbability = 0.35;
     }
@@ -41,35 +38,37 @@ function generateLabyrinth(difficulty) {
     const walls = [];
     const centerCol = Math.floor(cols / 2);
     const centerRow = Math.floor(rows / 2);
-
-    // Increase the clear zone size: 2 cells on each side, so a 5x5 area is always clear.
-    const clearZoneSize = 2;
-    const clearZoneCols = [];
-    const clearZoneRows = [];
-    for (let i = centerCol - clearZoneSize; i <= centerCol + clearZoneSize; i++) {
-        clearZoneCols.push(i);
-    }
-    for (let i = centerRow - clearZoneSize; i <= centerRow + clearZoneSize; i++) {
-        clearZoneRows.push(i);
-    }
+    const clearZoneSize = 3;
+    const centerX = boardWidth / 2;
+    const centerY = boardHeight / 2;
 
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-            // Skip cells in the clear zone so that no walls appear there.
-            if (clearZoneCols.includes(c) && clearZoneRows.includes(r)) {
+            if (c >= centerCol - clearZoneSize && c <= centerCol + clearZoneSize &&
+                r >= centerRow - clearZoneSize && r <= centerRow + clearZoneSize) {
                 continue;
             }
             if (Math.random() < wallProbability) {
-                walls.push({
-                    x: c * cellWidth,
-                    y: r * cellHeight,
-                    width: cellWidth,
-                    height: cellHeight
-                });
+                const wallX = c * cellWidth;
+                const wallY = r * cellHeight;
+
+                const distanceFromCenter = Math.sqrt(
+                    Math.pow((wallX + cellWidth/2) - centerX, 2) +
+                    Math.pow((wallY + cellHeight/2) - centerY, 2)
+                );
+
+                const safeDistance = Math.max(cellWidth, cellHeight) * 3;
+                if (distanceFromCenter > safeDistance) {
+                    walls.push({
+                        x: wallX,
+                        y: wallY,
+                        width: cellWidth,
+                        height: cellHeight
+                    });
+                }
             }
         }
     }
-    console.log("Generated labyrinth layout:", walls);
     return walls;
 }
 
