@@ -107,38 +107,134 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------
     const wallsOnScreen = {};
 
-    socket.on('labyrinthLayout', (layout) => {
-        console.log("Received labyrinth layout:", layout);
-        window.labyrinthLayout = layout; // Save layout globally for collision detection.
+    // handling sinple player map-gen
 
-        // Remove any existing walls.
-        for (const key in wallsOnScreen) {
-            board.removeChild(wallsOnScreen[key]);
+    if (gameMode === 'singleplayer') {
+
+        console.log("can I get a wallll-ah...");
+        const difficulty = urlParams.get('difficulty') || 'medium';
+        const labyrinthLayout = generateLabyrinth(difficulty);
+
+        renderLabyrinth(labyrinthLayout);
+
+    } else {
+        
+        socket.on('labyrinthLayout', (layout) => {
+            console.log("Received labyrinth layout:", layout);
+            window.labyrinthLayout = layout; // Save layout globally for collision detection.
+    
+            // Remove any existing walls.
+            for (const key in wallsOnScreen) {
+                board.removeChild(wallsOnScreen[key]);
+            }
+            Object.keys(wallsOnScreen).forEach(key => delete wallsOnScreen[key]);
+    
+            // Create wall elements.
+            layout.forEach(wall => {
+                const wallEl = document.createElement('div');
+                wallEl.classList.add('wall');
+                wallEl.style.position = 'absolute';
+                wallEl.style.left = wall.x + 'px';
+                wallEl.style.top = wall.y + 'px';
+                wallEl.style.width = wall.width + 'px';
+                wallEl.style.height = wall.height + 'px';
+                board.appendChild(wallEl);
+                wallsOnScreen[`${wall.x}-${wall.y}`] = wallEl;
+            });
+    
+            // Ensure the local player's spawn is in a safe zone.
+            if (checkWallCollision(player)) {
+                console.log("Player spawn in wall detected, repositioning to safe spawn.");
+                player.position = { x: board.clientWidth / 2, y: board.clientHeight / 2 };
+                player.update();
+            }
+    
+            ensureSafeSpawn(player); // clena up walls
+        });
+
+    }
+
+    // easier to duplicate the generator and render, etc here directly for single player:
+    function generateLabyrinth(difficulty) {
+
+        const boardWidth = 1300;
+        const boardHeight = 1000;
+        const cols = 26;
+        const rows = 20;
+        const cellWidth = boardWidth / cols;
+        const cellHeight = boardHeight / rows;
+    
+        let wallProbability = 0.2;
+        if (difficulty === 'hard') wallProbability = 0.35;
+    
+        const walls = [];
+        const centerCol = Math.floor(cols / 2);
+        const centerRow = Math.floor(rows / 2);
+        const clearZoneSize = 2;
+    
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (Math.abs(c - centerCol) <= clearZoneSize && Math.abs(r - centerRow) <= clearZoneSize) {
+                    continue;
+                }
+                if (Math.random() < wallProbability) {
+                    walls.push({
+                        x: c * cellWidth,
+                        y: r * cellHeight,
+                        width: cellWidth,
+                        height: cellHeight
+                    });
+                }
+            }
         }
-        Object.keys(wallsOnScreen).forEach(key => delete wallsOnScreen[key]);
 
-        // Create wall elements.
+        return walls;
+
+    }
+
+    function renderLabyrinth(layout) {
+
         layout.forEach(wall => {
             const wallEl = document.createElement('div');
             wallEl.classList.add('wall');
             wallEl.style.position = 'absolute';
-            wallEl.style.left = wall.x + 'px';
-            wallEl.style.top = wall.y + 'px';
-            wallEl.style.width = wall.width + 'px';
-            wallEl.style.height = wall.height + 'px';
+            wallEl.style.left = `${wall.x}px`;
+            wallEl.style.top = `${wall.y}px`;
+            wallEl.style.width = `${wall.width}px`;
+            wallEl.style.height = `${wall.height}px`;
             board.appendChild(wallEl);
-            wallsOnScreen[`${wall.x}-${wall.y}`] = wallEl;
         });
 
-        // Ensure the local player's spawn is in a safe zone.
-        if (checkWallCollision(player)) {
-            console.log("Player spawn in wall detected, repositioning to safe spawn.");
-            player.position = { x: board.clientWidth / 2, y: board.clientHeight / 2 };
+    }
+
+    function isInsideWall(x, y, labyrinthLayout) {
+        for (const wall of labyrinthLayout) {
+            if (x >= wall.x && x < wall.x + wall.width &&
+                y >= wall.y && y < wall.y + wall.height) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    document.addEventListener('keydown', (event) => {
+        const speed = 10;
+        let newX = player.x;
+        let newY = player.y;
+    
+        if (event.key === 'ArrowUp') newY -= speed;
+        if (event.key === 'ArrowDown') newY += speed;
+        if (event.key === 'ArrowLeft') newX -= speed;
+        if (event.key === 'ArrowRight') newX += speed;
+    
+        if (!isInsideWall(newX, newY, window.labyrinthLayout)) {
+            player.x = newX;
+            player.y = newY;
             player.update();
         }
-
-        ensureSafeSpawn(player); // clena up walls
     });
+    // easier to duplicate the generator and render, etc here directly for single player:
+    
 
     function ensureSafeSpawn(player) {
         let attempts = 0;
