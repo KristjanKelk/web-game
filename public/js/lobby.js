@@ -109,13 +109,31 @@ document.addEventListener('DOMContentLoaded', () => {
 // ajdusted start
 startButton.addEventListener('click', () => {
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameMode = urlParams.get('mode');
+
     if (gameMode === 'singleplayer') {
-        const botCount = document.getElementById('botCount').value;
+
         const difficulty = document.getElementById('gameDifficulty').value;
 
-        window.location.href = `game.html?mode=singleplayer&bots=${botCount}&difficulty=${difficulty}`;
+        const bot1 = document.getElementById('bot1').value;
+        const bot2 = document.getElementById('bot2').value;
+        const bot3 = document.getElementById('bot3').value;
+
+        const botConfig = new URLSearchParams({
+            mode: 'singleplayer',
+            difficulty,
+            bot1,
+            bot2,
+            bot3
+        }).toString();
+
+        window.location.href = `game.html?${botConfig}`;
+
     } else {
+
         socket.emit('startGame');
+
     }
 
 });

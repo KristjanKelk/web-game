@@ -48,6 +48,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const resourceManager = new ResourceManager(board, socket, roomCode, playerName, () => {});
     resourceManager.init();
 
+    // ------------- bots ------------------
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameMode = urlParams.get('mode');
+    const difficulty = urlParams.get('difficulty');
+
+    const botLevels = [
+        urlParams.get('bot1'),
+        urlParams.get('bot2'),
+        urlParams.get('bot3')
+    ].filter(bot => bot !== "None");
+
+    let gameSpeedMultiplier = 1;
+
+    if (difficulty === 'hard') {
+        gameSpeedMultiplier = 1.5;
+    } else if (difficulty === 'easy') {
+        gameSpeedMultiplier = 0.8;
+    }
+
+    const bots = [];
+
+    function spawnBot(level, index) {
+
+        const bot = new Player(board, { x: 100 + index * 50, y: 100 }, "red");
+        bot.level = level;
+
+        if (level === "Level 1") {
+            bot.speed = 2;
+        } else if (level === "Level 2") {
+            bot.speed = 3;
+        } else if (level === "Level 3") {
+            bot.speed = 4;
+        }
+
+        bots.push(bot);
+
+    }
+
+    botLevels.forEach((level, i) => spawnBot(level, i));
+
+    // ------------- bots ------------------
+
     // -------------------------
     // Wall (Labyrinth) Handling
     // -------------------------
