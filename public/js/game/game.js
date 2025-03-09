@@ -5,18 +5,33 @@ import { ResourceManager } from './resource.js';
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
 
+    // for bots -----------
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameMode = urlParams.get('mode');
+    console.log(gameMode); // debug
+    const difficulty = urlParams.get('difficulty');
+
+    // for bots ------------
+
     // Retrieve room info and player name from localStorage
     const roomCode = localStorage.getItem('roomCode');
     const playerName = localStorage.getItem('playerName');
 
-    if (!roomCode || !playerName) {
-        console.error("Missing roomCode or playerName.");
-        window.location.href = '/';
-    } else {
-        // Immediately join the game state.
-        socket.emit('joinGameState', { roomCode, playerName });
-        console.log(`Emitted joinGameState with roomCode: ${roomCode} and playerName: ${playerName}`);
+    if (gameMode != 'singleplayer') { // no room for sinpleplayer - taking socket off from locgi pretty much
+
+        if (!roomCode || !playerName) {
+            console.error("Missing roomCode or playerName.");
+            window.location.href = '/';
+        } else {
+            // Immediately join the game state.
+            socket.emit('joinGameState', { roomCode, playerName });
+            console.log(`Emitted joinGameState with roomCode: ${roomCode} and playerName: ${playerName}`);
+        }
+
     }
+
+    
 
     socket.on('joinError', (msg) => {
         console.error("Join error received from server:", msg);
@@ -49,10 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
     resourceManager.init();
 
     // ------------- bots ------------------
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameMode = urlParams.get('mode');
-    const difficulty = urlParams.get('difficulty');
 
     const botLevels = [
         urlParams.get('bot1'),
