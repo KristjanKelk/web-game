@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const difficulty = urlParams.get('difficulty') || 'medium';
         const labyrinthLayout = generateLabyrinth(difficulty);
 
+        window.labyrinthLayout = labyrinthLayout; // global walls
         renderLabyrinth(labyrinthLayout);
 
     } else {
@@ -218,6 +219,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     document.addEventListener('keydown', (event) => {
+
+        if (gameMode !== 'singleplayer') return; // Only enforce in single-player mode
+    
         const speed = 10;
         let newX = player.x;
         let newY = player.y;
@@ -227,11 +231,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'ArrowLeft') newX -= speed;
         if (event.key === 'ArrowRight') newX += speed;
     
-        if (!isInsideWall(newX, newY, window.labyrinthLayout)) {
+        if (!checkWallCollision({ position: { x: newX, y: newY }, width: player.width, height: player.height })) {
             player.x = newX;
             player.y = newY;
             player.update();
+            console.log("Not blocked by wall")
+        } else {
+            console.log("Blocked by wall!");
+            player.avatar.style.transform = 'translateX(2px)'; 
+            setTimeout(() => player.avatar.style.transform = '', 100);
         }
+    
     });
     // easier to duplicate the generator and render, etc here directly for single player:
     
