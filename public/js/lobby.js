@@ -66,18 +66,13 @@ socket.on('updatePlayerList', (players) => {
     startButton.style.display = amIModerator ? 'inline-block' : 'none';
 
     if (amIModerator) {
-        startButton.textContent = 'Start Multiplayer Game';
-        startButton.className = 'multi-player-btn';
+        if (players.length === 1) {
+            startButton.textContent = 'Start Single-Player Game';
+            startButton.className = 'single-player-btn';
 
-        // Disable button if fewer than 2 players
-        if (players.length < 2) {
-            startButton.disabled = true;
-            startButton.title = 'At least 2 players are required to start';
-            startButton.classList.add('disabled-btn');
         } else {
-            startButton.disabled = false;
-            startButton.title = '';
-            startButton.classList.remove('disabled-btn');
+            startButton.textContent = 'Start Multiplayer Game';
+            startButton.className = 'multi-player-btn';
         }
     }
 
