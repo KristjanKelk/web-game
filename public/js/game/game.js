@@ -118,49 +118,26 @@ document.addEventListener('DOMContentLoaded', () => {
         right: false
     };
 
-    window.addEventListener('keydown', (e) => {
+    function handleKey(e, isKeyDown) {
         if (gamePaused) return;
-        switch (e.key) {
-            case 'ArrowUp':
-            case 'w':
-                keysDown.up = true;
-                break;
-            case 'ArrowDown':
-            case 's':
-                keysDown.down = true;
-                break;
-            case 'ArrowLeft':
-            case 'a':
-                keysDown.left = true;
-                break;
-            case 'ArrowRight':
-            case 'd':
-                keysDown.right = true;
-                break;
+        const keyMap = {
+            'ArrowUp': 'up',
+            'w': 'up',
+            'ArrowDown': 'down',
+            's': 'down',
+            'ArrowLeft': 'left',
+            'a': 'left',
+            'ArrowRight': 'right',
+            'd': 'right'
+        };
+        const direction = keyMap[e.key];
+        if (direction) {
+            keysDown[direction] = isKeyDown;
         }
-    });
+    }
 
-    window.addEventListener('keyup', (e) => {
-        if (gamePaused) return;
-        switch (e.key) {
-            case 'ArrowUp':
-            case 'w':
-                keysDown.up = false;
-                break;
-            case 'ArrowDown':
-            case 's':
-                keysDown.down = false;
-                break;
-            case 'ArrowLeft':
-            case 'a':
-                keysDown.left = false;
-                break;
-            case 'ArrowRight':
-            case 'd':
-                keysDown.right = false;
-                break;
-        }
-    });
+    window.addEventListener('keydown', (e) => handleKey(e, true));
+    window.addEventListener('keyup', (e) => handleKey(e, false));
 
     /**
      * Main game loop: updates the local player's movement,
@@ -239,12 +216,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePlayerScores(scores) {
         const playerScoresUL = document.getElementById('playerScores');
         if (!playerScoresUL) return;
-        playerScoresUL.innerHTML = ''; // Clear current list
 
-        // Sort players by score descending and add rank numbers.
+        // Clear current list
+        playerScoresUL.innerHTML = '';
+
+        // Sort players by score descending
         const sortedPlayers = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+
+        // Add each player to the list
         sortedPlayers.forEach(([name, score], index) => {
             const li = document.createElement('li');
+            // Add styling for AI players
+            if (name.includes('Bot')) {
+                li.className = 'ai-player';
+            }
             li.textContent = `${index + 1}) ${name}: ${score}`;
             playerScoresUL.appendChild(li);
         });
@@ -388,6 +373,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Enhanced resource removal handling
+    socket.on('resourceRemoved', (resourceId) => {
+        // First check if we have this resource
+        const resEl = resourceManager.resourcesOnScreen[resourceId];
+        if (resEl) {
+            console.log(`Received resourceRemoved for ${resourceId} - removing from screen`);
+            // Remove it from the DOM
+            if (resEl.parentNode === board) {
+                board.removeChild(resEl);
+            }
+            // Delete it from our tracking object
+            delete resourceManager.resourcesOnScreen[resourceId];
+        }
+    });
+
+    socket.on('aiCollectedResource', (data) => {
+        console.log(`AI ${data.aiName} collected resource ${data.resourceId}`);
+
+        // Create a visual indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'ai-collection-indicator';
+        indicator.textContent = '+10';
+        indicator.style.position = 'absolute';
+        indicator.style.left = data.position.x + 'px';
+        indicator.style.top = data.position.y + 'px';
+        indicator.style.color = data.type === 'powerup' ? '#ff00ff' : '#ffff00';
+        indicator.style.fontWeight = 'bold';
+        indicator.style.fontSize = '16px';
+        indicator.style.zIndex = '100';
+        indicator.style.textShadow = '0 0 5px #000';
+        indicator.style.pointerEvents = 'none';
+        indicator.style.animation = 'fadeUpAndOut 1s forwards';
+
+        // Add to the board
+        board.appendChild(indicator);
+
+        // Remove after animation completes
+        setTimeout(() => {
+            if (indicator.parentNode === board) {
+                board.removeChild(indicator);
+            }
+        }, 1000);
+
+        // CRITICAL: Also manually remove the resource if it's still on screen
+        const resEl = resourceManager.resourcesOnScreen[data.resourceId];
+        if (resEl) {
+            if (resEl.parentNode === board) {
+                board.removeChild(resEl);
+            }
+            delete resourceManager.resourcesOnScreen[data.resourceId];
+        }
+    });
+
     socket.on('gameQuit', (data) => {
         console.log("Received gameQuit event:", data);
         alert(data.message);
@@ -417,9 +455,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Remote players: update their positions as received.
     const remotePlayers = {};
+    // Add data-ai-id attribute to remote avatars
     socket.on('playerPositions', (positions) => {
         for (const id in positions) {
             if (id === socket.id) continue;
+
             let remotePlayer = remotePlayers[id];
             if (!remotePlayer) {
                 remotePlayer = document.createElement('div');
@@ -428,9 +468,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 remotePlayer.style.height = '40px';
                 remotePlayer.style.position = 'absolute';
                 remotePlayer.style.backgroundColor = 'red';
+
+                // Add data attribute to identify AI players
+                if (id.startsWith('ai-')) {
+                    remotePlayer.dataset.aiId = id;
+                }
+
                 board.appendChild(remotePlayer);
                 remotePlayers[id] = remotePlayer;
             }
+
             const pos = positions[id].position;
             remotePlayer.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
         }
