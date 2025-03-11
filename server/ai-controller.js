@@ -1,484 +1,65 @@
-// server/ai-controller.js
-// Overhauled AI controller with optimized resource collection
+/**
+ * AI Controller Module
+ * Manages AI players for single-player mode
+ */
+const labyrinthGenerator = require('./labyrinthGenerator');
 
-// AI player names
-const AI_NAMES = ["Bot Alpha", "Bot Beta", "Bot Gamma", "Bot Delta", "Bot Epsilon"];
+/**
+ * Creates AI players for a room
+ * @param {Object} room - The room object
+ * @param {number} numOpponents - Number of AI opponents to create
+ * @param {string} difficulty - AI difficulty level (Easy, Medium, Hard)
+ * @returns {Object} Updated room object with AI players
+ */
+function createAIPlayers(room, numOpponents, difficulty) {
+    if (!room) return room;
 
-// AI difficulty configurations with higher performance parameters
-const AI_DIFFICULTY = {
-    Easy: {
-        decisionSpeed: 60, // ms between decisions
-        moveAccuracy: 0.75,
-        resourceDetectionRange: 250,
-        strategyChangeFrequency: 3000,
-        moveSpeed: 5.5,
-        collisionBuffer: 20, // larger collision area = easier to collect
-        targetPrecision: 10, // how close the bot tries to get to the center of a resource
-    },
-    Medium: {
-        decisionSpeed: 40,
-        moveAccuracy: 0.85,
-        resourceDetectionRange: 450,
-        strategyChangeFrequency: 2500,
-        moveSpeed: 7,
-        collisionBuffer: 15,
-        targetPrecision: 7,
-    },
-    Hard: {
-        decisionSpeed: 20,
-        moveAccuracy: 0.95,
-        resourceDetectionRange: 800,
-        strategyChangeFrequency: 2000,
-        moveSpeed: 8.5,
-        collisionBuffer: 8, // smaller buffer = more precise targeting
-        targetPrecision: 3,
+    // Initialize AI players container if it doesn't exist
+    if (!room.aiPlayers) {
+        room.aiPlayers = {};
     }
-};
 
-/**
- * Check if a position is safe for spawning (not colliding with walls)
- */
-function isSafeSpawnPosition(position, labyrinth) {
-    // Add a safety buffer around the avatar
-    const avatar = {
-        x: position.x - 5,
-        y: position.y - 5,
-        width: 50, // Larger than actual avatar for safety
-        height: 50
-    };
+    // Determine AI speed based on difficulty
+    let aiSpeed = 3; // Default Medium
+    if (difficulty === 'Easy') {
+        aiSpeed = 2;
+    } else if (difficulty === 'Hard') {
+        aiSpeed = 4;
+    }
 
-    return !checkWallCollision(avatar, labyrinth);
-}
-
-/**
- * Create AI players for a room
- */
-function createAIPlayers(room, count, difficulty) {
-    // Clear any existing AI players
-    room.aiPlayers = {};
-
-    // Spawn positions spread across the board
-    const potentialSpawnPositions = [
-        { x: 150, y: 150 },
-        { x: 800, y: 150 },
-        { x: 150, y: 600 },
-        { x: 800, y: 600 },
-        { x: 500, y: 400 },
-        { x: 300, y: 300 },
-        { x: 700, y: 300 },
-        { x: 300, y: 500 },
-        { x: 700, y: 500 }
-    ];
-
-    // Shuffle positions for randomness
-    const shuffledPositions = [...potentialSpawnPositions]
-        .sort(() => Math.random() - 0.5);
-
-    // Filter spawn positions that collide with walls
-    const labyrinth = room.labyrinthLayout || [];
-    const safeSpawnPositions = shuffledPositions.filter(pos =>
-        isSafeSpawnPosition(pos, labyrinth)
-    );
-
-    for (let i = 0; i < count; i++) {
-        const aiName = `${AI_NAMES[i]} (${difficulty})`;
+    // Create the specified number of AI players
+    for (let i = 0; i < numOpponents; i++) {
         const aiId = `ai-${i}-${Date.now()}`;
+        const aiName = `AI-${i+1}`;
 
-        // Select a safe spawn position or generate one if none available
-        let spawnPosition;
-        if (safeSpawnPositions.length > i) {
-            // Use predetermined safe position
-            spawnPosition = safeSpawnPositions[i];
-        } else {
-            // Generate a random position that doesn't collide with walls
-            let attempts = 0;
-            let candidateX, candidateY;
-            let collision = true;
-
-            while (collision && attempts < 20) {
-                candidateX = 100 + Math.floor(Math.random() * 800);
-                candidateY = 100 + Math.floor(Math.random() * 600);
-
-                const candidatePos = {
-                    x: candidateX,
-                    y: candidateY,
-                    width: 40,
-                    height: 40
-                };
-
-                collision = checkWallCollision(candidatePos, labyrinth);
-                attempts++;
-            }
-
-            // If we couldn't find a non-colliding position, use the center
-            if (collision) {
-                spawnPosition = { x: 500, y: 400 };
-            } else {
-                spawnPosition = { x: candidateX, y: candidateY };
-            }
-        }
-
-        room.aiPlayers[aiId] = {
-            name: aiName,
-            difficulty: difficulty,
-            score: 0,
-            position: spawnPosition,
-            targetResource: null,
-            targetPrecision: AI_DIFFICULTY[difficulty].targetPrecision,
-            lastDecision: Date.now(),
-            lastStrategyChange: Date.now(),
-            // Path memory to avoid getting stuck
-            lastPositions: [],
-            stuckCounter: 0,
-            // Add collection state to indicate when very close to resource
-            collectingState: false,
-            collectingResourceId: null,
-            collisionBuffer: AI_DIFFICULTY[difficulty].collisionBuffer,
-            moveSpeed: AI_DIFFICULTY[difficulty].moveSpeed
-        };
-
-        // Add to players list for score tracking
+        // Create AI player record in the players list
         room.players[aiId] = {
             name: aiName,
             score: 0,
             isAI: true
         };
-    }
 
-    return room;
-}
+        // Create AI player configuration
+        room.aiPlayers[aiId] = {
+            id: aiId,
+            name: aiName,
+            position: {
+                x: Math.random() * 950 + 50, // Random position away from edges
+                y: Math.random() * 750 + 50
+            },
+            target: null,
+            lastTargetUpdate: Date.now(),
+            speed: aiSpeed,
+            difficulty
+        };
 
-/**
- * Update AI player positions and actions
- */
-// Replace this function in your ai-controller.js:
-
-function updateAIPlayers(room, onResourceCollected) {
-    if (!room || !room.aiPlayers || !room.resources) return room;
-
-    const now = Date.now();
-    const labyrinth = room.labyrinthLayout || [];
-
-    // Process potential resource collections first
-    for (const aiId in room.aiPlayers) {
-        const ai = room.aiPlayers[aiId];
-
-        // Check for collisions with any resources
-        for (const resource of [...room.resources]) {
-            // Use a larger collision buffer for initial detection
-            if (checkResourceCollision(ai, resource, 10)) {
-                console.log(`AI ${ai.name} collecting resource ${resource.id}`);
-
-                // Remove resource from room's resource array
-                room.resources = room.resources.filter(r => r.id !== resource.id);
-
-                // Add points to the AI's score
-                const points = 10;
-                room.players[aiId].score += points;
-                room.aiPlayers[aiId].score += points;
-
-                // Reset targeting for this AI
-                if (ai.targetResource === resource.id) {
-                    ai.targetResource = null;
-                    ai.collectingState = false;
-                    ai.collectingResourceId = null;
-                }
-
-                // Call resource collected callback
-                if (onResourceCollected) {
-                    onResourceCollected(room, aiId, resource);
-                }
-
-                // Only collect one resource per update
-                break;
-            }
+        // Add to positions for rendering
+        if (!room.positions) {
+            room.positions = {};
         }
-    }
-
-    // Then handle AI movement
-    for (const aiId in room.aiPlayers) {
-        const ai = room.aiPlayers[aiId];
-        const difficultySettings = AI_DIFFICULTY[ai.difficulty] || AI_DIFFICULTY.Medium;
-
-        // Only update AI position based on its decision speed
-        if (now - ai.lastDecision < difficultySettings.decisionSpeed) continue;
-
-        ai.lastDecision = now;
-
-        // Keep track of positions to detect if stuck
-        if (!ai.lastPositions) ai.lastPositions = [];
-        ai.lastPositions.push({...ai.position});
-
-        // Keep only the last 10 positions
-        if (ai.lastPositions.length > 10) {
-            ai.lastPositions.shift();
-        }
-
-        // Check if the AI is stuck
-        if (ai.lastPositions.length >= 5) {
-            const oldPos = ai.lastPositions[0];
-            const currentPos = ai.position;
-            const distance = Math.sqrt(
-                Math.pow(currentPos.x - oldPos.x, 2) +
-                Math.pow(currentPos.y - oldPos.y, 2)
-            );
-
-            if (distance < 20) {
-                ai.stuckCounter++;
-
-                if (ai.stuckCounter > 3) {
-                    ai.targetResource = null;
-                    ai.stuckCounter = 0;
-                    ai.lastStrategyChange = now;
-                    ai.collectingState = false;
-                }
-            } else {
-                ai.stuckCounter = 0;
-            }
-        }
-
-        // Periodically change strategy/target
-        if (now - ai.lastStrategyChange > difficultySettings.strategyChangeFrequency) {
-            ai.lastStrategyChange = now;
-            ai.targetResource = null;
-            ai.collectingState = false;
-        }
-
-        // Find a new target if needed
-        if (!ai.targetResource || !room.resources.find(r => r.id === ai.targetResource)) {
-            ai.collectingState = false;
-            ai.collectingResourceId = null;
-
-            // Find all resources in detection range
-            const visibleResources = room.resources.filter(resource => {
-                const dx = resource.left - ai.position.x;
-                const dy = resource.top - ai.position.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                return distance <= difficultySettings.resourceDetectionRange;
-            });
-
-            if (visibleResources.length > 0) {
-                // Prefer power-ups based on difficulty
-                const powerUps = visibleResources.filter(r => r.type === 'powerup');
-                const powerUpPref = ai.difficulty === 'Hard' ? 0.9 :
-                    ai.difficulty === 'Medium' ? 0.8 : 0.7;
-
-                const targetPool = Math.random() < powerUpPref && powerUps.length > 0 ?
-                    powerUps : visibleResources;
-
-                // Hard bots prioritize closest resources
-                if (ai.difficulty === 'Hard' && targetPool.length > 0) {
-                    let closest = targetPool[0];
-                    let closestDist = Infinity;
-
-                    for (const resource of targetPool) {
-                        const dx = resource.left - ai.position.x;
-                        const dy = resource.top - ai.position.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-
-                        if (dist < closestDist) {
-                            closest = resource;
-                            closestDist = dist;
-                        }
-                    }
-
-                    ai.targetResource = closest.id;
-                } else {
-                    // Others pick somewhat randomly
-                    ai.targetResource = targetPool[Math.floor(Math.random() * targetPool.length)].id;
-                }
-            } else if (room.resources.length > 0 && ai.difficulty !== 'Easy') {
-                // If nothing in range but resources exist, target a random one (Medium/Hard only)
-                const allPowerUps = room.resources.filter(r => r.type === 'powerup');
-                const pickPowerUp = Math.random() < 0.8 && allPowerUps.length > 0;
-
-                const anyTarget = pickPowerUp ?
-                    allPowerUps[Math.floor(Math.random() * allPowerUps.length)] :
-                    room.resources[Math.floor(Math.random() * room.resources.length)];
-
-                ai.targetResource = anyTarget.id;
-            }
-        }
-
-        // Move towards target resource
-        let dx = 0, dy = 0;
-        const moveSpeed = ai.moveSpeed || difficultySettings.moveSpeed;
-
-        if (ai.targetResource) {
-            const target = room.resources.find(r => r.id === ai.targetResource);
-
-            if (target) {
-                // Calculate center points
-                const aiCenterX = ai.position.x + 20; // Avatar is 40x40
-                const aiCenterY = ai.position.y + 20;
-                const resourceCenterX = target.left + 10; // Resource is 20x20
-                const resourceCenterY = target.top + 10;
-
-                // Vector from AI to resource center
-                dx = resourceCenterX - aiCenterX;
-                dy = resourceCenterY - aiCenterY;
-
-                // Calculate distance to target
-                const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
-
-                // Check if we're close enough to consider collecting
-                const collectionDistance = 25 + ai.collisionBuffer;
-
-                // If close to target, enter collection mode with higher precision
-                if (distanceToTarget < collectionDistance) {
-                    ai.collectingState = true;
-                    ai.collectingResourceId = target.id;
-
-                    // Slow down and increase precision when very close
-                    const slowFactor = Math.max(0.3, distanceToTarget / collectionDistance);
-
-                    // Precise movement directly to resource center
-                    if (distanceToTarget > ai.targetPrecision) {
-                        // Normalize and scale movement
-                        const normalizedSpeed = moveSpeed * slowFactor;
-                        dx = (dx / distanceToTarget) * normalizedSpeed;
-                        dy = (dy / distanceToTarget) * normalizedSpeed;
-                    } else {
-                        // Do a final collision check
-                        const collisionDetected = checkResourceCollision(ai, target, ai.collisionBuffer);
-
-                        if (collisionDetected) {
-                            // Remove resource from room's resource array
-                            room.resources = room.resources.filter(r => r.id !== target.id);
-
-                            // Add points to the AI's score
-                            const points = 10;
-                            room.players[aiId].score += points;
-                            room.aiPlayers[aiId].score += points;
-
-                            // Call resource collected callback
-                            if (onResourceCollected) {
-                                onResourceCollected(room, aiId, target);
-                            }
-
-                            // Reset targeting
-                            ai.targetResource = null;
-                            ai.collectingState = false;
-                            ai.collectingResourceId = null;
-
-                            // Skip movement for this cycle
-                            continue;
-                        }
-                    }
-                } else {
-                    // Normal movement toward target
-                    // Normalize
-                    if (distanceToTarget > 0) {
-                        dx = (dx / distanceToTarget) * moveSpeed;
-                        dy = (dy / distanceToTarget) * moveSpeed;
-                    }
-
-                    // Apply move accuracy
-                    if (Math.random() > difficultySettings.moveAccuracy) {
-                        // Random movement when decision accuracy fails
-                        dx = (Math.random() * 2 - 1) * moveSpeed;
-                        dy = (Math.random() * 2 - 1) * moveSpeed;
-                    }
-                }
-            }
-        } else {
-            // No target - intelligent exploration
-            const centerX = 500;
-            const centerY = 400;
-            const toCenter = Math.random() < 0.7;
-
-            if (toCenter) {
-                // Move toward center with some randomness
-                dx = ((centerX - ai.position.x) / 100) * moveSpeed * (0.5 + Math.random());
-                dy = ((centerY - ai.position.y) / 100) * moveSpeed * (0.5 + Math.random());
-            } else {
-                // Pure random movement
-                dx = (Math.random() * 2 - 1) * moveSpeed;
-                dy = (Math.random() * 2 - 1) * moveSpeed;
-            }
-        }
-
-        // Test new position for wall collisions
-        const newX = ai.position.x + dx;
-        const newY = ai.position.y + dy;
-
-        // Check wall collisions
-        let collides = false;
-        for (const wall of labyrinth) {
-            if (
-                newX < wall.x + wall.width &&
-                newX + 40 > wall.x &&
-                newY < wall.y + wall.height &&
-                newY + 40 > wall.y
-            ) {
-                collides = true;
-                break;
-            }
-        }
-
-        // If no collision, update position
-        if (!collides) {
-            // Constrain to board
-            ai.position.x = Math.max(0, Math.min(960, newX));
-            ai.position.y = Math.max(0, Math.min(760, newY));
-        } else {
-            // Smart wall avoidance
-            // Try X direction only
-            const newXOnly = ai.position.x + dx;
-            const testX = {
-                x: newXOnly,
-                y: ai.position.y,
-                width: 40,
-                height: 40
-            };
-
-            const canMoveX = !checkWallCollision(testX, labyrinth);
-
-            // Try Y direction only
-            const newYOnly = ai.position.y + dy;
-            const testY = {
-                x: ai.position.x,
-                y: newYOnly,
-                width: 40,
-                height: 40
-            };
-
-            const canMoveY = !checkWallCollision(testY, labyrinth);
-
-            // Update position
-            if (canMoveX) {
-                ai.position.x = Math.max(0, Math.min(960, newXOnly));
-            }
-
-            if (canMoveY) {
-                ai.position.y = Math.max(0, Math.min(760, newYOnly));
-            }
-
-            // If completely blocked, try perpendicular direction
-            if (!canMoveX && !canMoveY) {
-                ai.stuckCounter += 2;
-
-                const perpX = dy * (Math.random() > 0.5 ? 1 : -1);
-                const perpY = dx * (Math.random() > 0.5 ? 1 : -1);
-
-                const perpTestPos = {
-                    x: ai.position.x + perpX,
-                    y: ai.position.y + perpY,
-                    width: 40,
-                    height: 40
-                };
-
-                if (!checkWallCollision(perpTestPos, labyrinth)) {
-                    ai.position.x = Math.max(0, Math.min(960, ai.position.x + perpX));
-                    ai.position.y = Math.max(0, Math.min(760, ai.position.y + perpY));
-                }
-            }
-        }
-
-        // Update the position in the positions list for rendering
         room.positions[aiId] = {
-            playerName: ai.name,
-            position: ai.position
+            playerName: aiName,
+            position: room.aiPlayers[aiId].position
         };
     }
 
@@ -486,133 +67,259 @@ function updateAIPlayers(room, onResourceCollected) {
 }
 
 /**
- * Check if an AI avatar collides with a resource
+ * Updates AI player positions and actions
+ * @param {Object} room - The room object
+ * @param {Function} resourceCollectionCallback - Callback when AI collects resource
+ * @returns {Object} Updated room object
  */
-function checkResourceCollision(ai, resource, buffer = 0) {
-    // Get AI avatar center
-    const aiCenterX = ai.position.x + 20; // Half of 40
-    const aiCenterY = ai.position.y + 20;
-
-    // Get resource center
-    const resourceCenterX = resource.left + 10; // Half of 20
-    const resourceCenterY = resource.top + 10;
-
-    // Calculate distance between centers
-    const dx = aiCenterX - resourceCenterX;
-    const dy = aiCenterY - resourceCenterY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Consider it a hit if centers are close enough
-    // Buffer increases the effective hit radius
-    return distance < (20 + buffer); // 20 = radius of AI (20) + radius of resource (10) - 10 for overlap
-}
-
-/**
- * Check if player collides with any wall
- */
-function checkWallCollision(player, labyrinthLayout) {
-    for (const wall of labyrinthLayout) {
-        if (
-            player.x < wall.x + wall.width &&
-            player.x + player.width > wall.x &&
-            player.y < wall.y + wall.height &&
-            player.y + player.height > wall.y
-        ) {
-            return true;
-        }
+function updateAIPlayers(room, resourceCollectionCallback) {
+    if (!room || !room.aiPlayers || Object.keys(room.aiPlayers).length === 0) {
+        return room;
     }
-    return false;
-}
 
-/**
- * Reset AI player positions for game restart
- */
-function resetAIPlayers(room) {
-    if (!room || !room.aiPlayers) return room;
-
-    // Generate spawn positions that don't collide with walls
-    const labyrinth = room.labyrinthLayout || [];
-
-    // Potential spawn positions
-    const potentialSpawnPositions = [
-        { x: 150, y: 150 },
-        { x: 800, y: 150 },
-        { x: 150, y: 600 },
-        { x: 800, y: 600 },
-        { x: 500, y: 400 },
-        { x: 300, y: 300 },
-        { x: 700, y: 300 },
-        { x: 300, y: 500 },
-        { x: 700, y: 500 }
-    ];
-
-    // Shuffle positions
-    const shuffledPositions = [...potentialSpawnPositions]
-        .sort(() => Math.random() - 0.5);
-
-    // Filter safe positions
-    const safeSpawnPositions = shuffledPositions.filter(pos =>
-        isSafeSpawnPosition(pos, labyrinth)
-    );
-
-    let i = 0;
+    // For each AI player
     for (const aiId in room.aiPlayers) {
-        // Reset score
-        room.aiPlayers[aiId].score = 0;
-        room.players[aiId].score = 0;
+        const ai = room.aiPlayers[aiId];
 
-        // Choose a safe spawn position
-        let spawnPosition;
-        if (safeSpawnPositions.length > i) {
-            spawnPosition = safeSpawnPositions[i];
-        } else {
-            // Find a safe position
-            let attempts = 0;
-            let candidateX, candidateY;
-            let collision = true;
+        // Skip if AI doesn't have a valid position
+        if (!ai.position) continue;
 
-            while (collision && attempts < 20) {
-                candidateX = 100 + Math.floor(Math.random() * 800);
-                candidateY = 100 + Math.floor(Math.random() * 600);
-
-                const candidatePos = {
-                    x: candidateX,
-                    y: candidateY,
-                    width: 40,
-                    height: 40
-                };
-
-                collision = checkWallCollision(candidatePos, labyrinth);
-                attempts++;
-            }
-
-            if (collision) {
-                spawnPosition = { x: 500, y: 400 };
-            } else {
-                spawnPosition = { x: candidateX, y: candidateY };
-            }
+        // Find a new target periodically or when target is null
+        if (!ai.target || Date.now() - ai.lastTargetUpdate > 3000) {
+            findNewTarget(room, ai);
         }
 
-        // Reset bot state
-        room.aiPlayers[aiId].position = spawnPosition;
-        room.aiPlayers[aiId].targetResource = null;
-        room.aiPlayers[aiId].lastDecision = Date.now();
-        room.aiPlayers[aiId].lastStrategyChange = Date.now();
-        room.aiPlayers[aiId].lastPositions = [];
-        room.aiPlayers[aiId].stuckCounter = 0;
-        room.aiPlayers[aiId].collectingState = false;
-        room.aiPlayers[aiId].collectingResourceId = null;
+        // Move toward target if one exists
+        if (ai.target) {
+            moveTowardTarget(room, ai);
 
-        i++;
+            // Check for resource collection
+            checkResourceCollection(room, ai, resourceCollectionCallback);
+        }
+
+        // Update position in the positions object for rendering
+        if (!room.positions[aiId]) {
+            room.positions[aiId] = { playerName: ai.name, position: { x: 0, y: 0 } };
+        }
+        room.positions[aiId].position = ai.position;
     }
 
     return room;
 }
 
+/**
+ * Finds a new target for the AI
+ * @param {Object} room - The room object
+ * @param {Object} ai - The AI player object
+ */
+function findNewTarget(room, ai) {
+    // If resources exist, pick one as a target
+    if (room.resources && room.resources.length > 0) {
+        // Choose closest resource or random resource based on difficulty
+        let targetResource;
+
+        if (ai.difficulty === 'Hard') {
+            // Hard AI picks the closest resource
+            let closestDistance = Infinity;
+
+            for (const resource of room.resources) {
+                const distance = calculateDistance(
+                    ai.position.x, ai.position.y,
+                    resource.left, resource.top
+                );
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    targetResource = resource;
+                }
+            }
+        } else {
+            // Easy/Medium AI picks a random resource
+            const randomIndex = Math.floor(Math.random() * room.resources.length);
+            targetResource = room.resources[randomIndex];
+        }
+
+        // Set the target
+        if (targetResource) {
+            ai.target = {
+                id: targetResource.id,
+                x: targetResource.left,
+                y: targetResource.top,
+                type: targetResource.type
+            };
+            ai.lastTargetUpdate = Date.now();
+        }
+    } else {
+        // No resources available, wander randomly
+        ai.target = {
+            id: 'random',
+            x: Math.random() * 950 + 50,
+            y: Math.random() * 750 + 50,
+            type: 'random'
+        };
+        ai.lastTargetUpdate = Date.now();
+    }
+}
+
+/**
+ * Moves AI toward its target
+ * @param {Object} room - The room object
+ * @param {Object} ai - The AI player object
+ */
+function moveTowardTarget(room, ai) {
+    if (!ai.target || !ai.position) return;
+
+    // Calculate direction vector
+    const dx = ai.target.x - ai.position.x;
+    const dy = ai.target.y - ai.position.y;
+
+    // Normalize the direction vector
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If we're very close to target, consider it reached
+    if (distance < 5) {
+        if (ai.target.id !== 'random') {
+            // Target was a resource but we've reached it
+            // We'll pick a new target on next update
+            ai.target = null;
+        }
+        return;
+    }
+
+    // Calculate normalized movement vector
+    const normalizedDx = dx / distance;
+    const normalizedDy = dy / distance;
+
+    // Calculate new position
+    const newX = ai.position.x + normalizedDx * ai.speed;
+    const newY = ai.position.y + normalizedDy * ai.speed;
+
+    // Check if new position would hit a wall
+    if (room.labyrinthLayout && room.labyrinthLayout.length > 0) {
+        // Check a few points along the path to detect wall collisions
+        const steps = 3;
+        let collision = false;
+
+        for (let i = 1; i <= steps; i++) {
+            const checkX = ai.position.x + (normalizedDx * ai.speed * i) / steps;
+            const checkY = ai.position.y + (normalizedDy * ai.speed * i) / steps;
+
+            if (labyrinthGenerator.isInsideWall(checkX, checkY, room.labyrinthLayout)) {
+                collision = true;
+                break;
+            }
+        }
+
+        if (collision) {
+            // Wall collision detected, pick a new random target
+            ai.target = {
+                id: 'random',
+                x: Math.random() * 950 + 50,
+                y: Math.random() * 750 + 50,
+                type: 'random'
+            };
+            ai.lastTargetUpdate = Date.now();
+            return;
+        }
+    }
+
+    // Update position
+    ai.position.x = newX;
+    ai.position.y = newY;
+
+    // Ensure AI stays within board boundaries
+    ai.position.x = Math.max(0, Math.min(1300 - 40, ai.position.x)); // Assuming width of 40
+    ai.position.y = Math.max(0, Math.min(1000 - 40, ai.position.y)); // Assuming height of 40
+}
+
+/**
+ * Checks if AI has collected a resource
+ * @param {Object} room - The room object
+ * @param {Object} ai - The AI player object
+ * @param {Function} resourceCollectionCallback - Callback when AI collects resource
+ */
+function checkResourceCollection(room, ai, resourceCollectionCallback) {
+    if (!room.resources || !ai.position) return;
+
+    const aiRect = {
+        left: ai.position.x,
+        right: ai.position.x + 40, // Assuming width of 40
+        top: ai.position.y,
+        bottom: ai.position.y + 40 // Assuming height of 40
+    };
+
+    for (const resource of room.resources) {
+        const resourceRect = {
+            left: resource.left,
+            right: resource.left + 20, // Assuming width of 20
+            top: resource.top,
+            bottom: resource.top + 20 // Assuming height of 20
+        };
+
+        // Check for collision
+        if (aiRect.left < resourceRect.right &&
+            aiRect.right > resourceRect.left &&
+            aiRect.top < resourceRect.bottom &&
+            aiRect.bottom > resourceRect.top) {
+
+            // AI has collected this resource
+            resourceCollectionCallback(room, ai.id, resource);
+
+            // Clear target since resource is collected
+            ai.target = null;
+
+            break;
+        }
+    }
+}
+
+/**
+ * Resets AI player positions for game restart
+ * @param {Object} room - The room object
+ * @returns {Object} Updated room object
+ */
+function resetAIPlayers(room) {
+    if (!room || !room.aiPlayers) return room;
+
+    for (const aiId in room.aiPlayers) {
+        // Reset position to a new random location
+        room.aiPlayers[aiId].position = {
+            x: Math.random() * 950 + 50,
+            y: Math.random() * 750 + 50
+        };
+
+        // Reset target
+        room.aiPlayers[aiId].target = null;
+        room.aiPlayers[aiId].lastTargetUpdate = Date.now();
+
+        // Update position in the positions object
+        if (room.positions && room.positions[aiId]) {
+            room.positions[aiId].position = room.aiPlayers[aiId].position;
+        }
+
+        // Reset score
+        if (room.players && room.players[aiId]) {
+            room.players[aiId].score = 0;
+        }
+    }
+
+    return room;
+}
+
+/**
+ * Calculate distance between two points
+ * @param {number} x1 - First point x coordinate
+ * @param {number} y1 - First point y coordinate
+ * @param {number} x2 - Second point x coordinate
+ * @param {number} y2 - Second point y coordinate
+ * @returns {number} Distance between points
+ */
+function calculateDistance(x1, y1, x2, y2) {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+}
+
 module.exports = {
     createAIPlayers,
     updateAIPlayers,
-    resetAIPlayers,
-    AI_NAMES,
-    AI_DIFFICULTY
+    resetAIPlayers
 };
