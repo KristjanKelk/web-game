@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const AIController = require('./ai-controller');
 
 const app = express();
 const PORT = 3000;
@@ -147,6 +148,39 @@ setInterval(() => {
     }
 }, 1000);
 
+// Handle AI resource collection
+function handleAIResourceCollection(room, aiId, resource) {
+    // Ensure room code is available
+    const roomCode = room.roomCode;
+    if (!roomCode) return;
+
+    // Always emit resource removal to all clients immediately
+    io.to(roomCode).emit('resourceRemoved', resource.id);
+
+    // If it was a power-up, apply effect
+    if (resource.type === 'powerup') {
+        io.to(roomCode).emit('powerUpEffect', {
+            source: room.aiPlayers[aiId].name,
+            effect: 'slow',
+            duration: 5000
+        });
+    }
+
+    // Build and emit updated scores
+    const allScores = {};
+    for (const [id, playerObj] of Object.entries(room.players)) {
+        allScores[playerObj.name] = playerObj.score;
+    }
+    io.to(roomCode).emit('scoresUpdated', allScores);
+
+    // Spawn a new resource if needed to maintain resource count
+    setTimeout(() => {
+        if (room.resources && room.resources.length < 5) {
+            spawnResourceForRoom(roomCode);
+        }
+    }, 500);
+}
+
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
@@ -160,11 +194,15 @@ io.on('connection', (socket) => {
             settings: {
                 difficulty: 'Easy',
                 rounds: 3,
+                gameMode: 'Multiplayer', // Default to multiplayer
+                aiOpponents: 1,          // Default AI opponent count
+                aiDifficulty: 'Medium'
             },
             inGame: false,
             resources: [],
             positions: {},
-            labyrinthLayout: []
+            labyrinthLayout: [],
+            aiPlayers: {}
         };
         socket.emit('gameCreated', { roomCode });
     });
@@ -242,12 +280,78 @@ io.on('connection', (socket) => {
         socket.emit('scoresUpdated', allScores);
     });
 
+    // Handle AI Settings update
+    socket.on('updateAISettings', (data) => {
+        const { roomCode, aiOpponents, aiDifficulty } = data;
+
+        if (!rooms[roomCode]) {
+            socket.emit('settingsError', 'Room does not exist.');
+            return;
+        }
+
+        if (rooms[roomCode].moderator !== socket.id) {
+            socket.emit('settingsError', 'Only the moderator can update settings.');
+            return;
+        }
+
+        rooms[roomCode].settings.aiOpponents = aiOpponents;
+        rooms[roomCode].settings.aiDifficulty = aiDifficulty;
+
+        io.to(roomCode).emit('aiSettingsUpdated', {
+            aiOpponents,
+            aiDifficulty
+        });
+    });
+
+    // Handle Game Mode update
+    socket.on('updateGameMode', (data) => {
+        const { roomCode, gameMode } = data;
+
+        if (!rooms[roomCode]) {
+            socket.emit('settingsError', 'Room does not exist.');
+            return;
+        }
+
+        if (rooms[roomCode].moderator !== socket.id) {
+            socket.emit('settingsError', 'Only the moderator can update game mode.');
+            return;
+        }
+
+        rooms[roomCode].settings.gameMode = gameMode;
+        io.to(roomCode).emit('gameModeUpdated', { gameMode });
+    });
+
     // START GAME (Only Moderator)
     socket.on('startGame', (roomCode) => {
         if (!rooms[roomCode]) return;
         if (rooms[roomCode].moderator !== socket.id) {
             socket.emit('startError', 'Only the moderator can start the game.');
             return;
+        }
+
+        const gameMode = rooms[roomCode].settings.gameMode;
+        const playerCount = Object.keys(rooms[roomCode].players).length;
+
+        // For multiplayer, we need at least 2 human players
+        if (gameMode === 'Multiplayer' && playerCount < 2) {
+            socket.emit('startError', 'At least 2 players are required to start a multiplayer game.');
+            return;
+        }
+
+        // For single player, add AI opponents
+        if (gameMode === 'SinglePlayer') {
+            const aiOpponents = parseInt(rooms[roomCode].settings.aiOpponents);
+            const aiDifficulty = rooms[roomCode].settings.aiDifficulty;
+
+            // Create AI players using AIController
+            rooms[roomCode] = AIController.createAIPlayers(
+                rooms[roomCode],
+                aiOpponents,
+                aiDifficulty
+            );
+
+            // Update player list with AI players included
+            io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
         }
 
         rooms[roomCode].inGame = true;
@@ -267,6 +371,11 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('timeUpdate', timeLeft);
             if (timeLeft <= 0) {
                 clearInterval(rooms[roomCode].timerInterval);
+
+                // Also clear AI interval if it exists
+                if (rooms[roomCode].aiInterval) {
+                    clearInterval(rooms[roomCode].aiInterval);
+                }
 
                 let highestScore = -1;
                 let winner = null;
@@ -309,6 +418,27 @@ io.on('connection', (socket) => {
         const labyrinthLayout = generateLabyrinth(difficulty);
         rooms[roomCode].labyrinthLayout = labyrinthLayout;
         io.to(roomCode).emit('labyrinthLayout', labyrinthLayout);
+
+        // Set up AI interval for single player mode
+        if (gameMode === 'SinglePlayer') {
+            rooms[roomCode].aiInterval = setInterval(() => {
+                if (!rooms[roomCode] || rooms[roomCode].paused || !rooms[roomCode].inGame) {
+                    if (!rooms[roomCode] || !rooms[roomCode].inGame) {
+                        clearInterval(rooms[roomCode].aiInterval);
+                    }
+                    return;
+                }
+
+                // Update AI players using AIController
+                rooms[roomCode] = AIController.updateAIPlayers(
+                    rooms[roomCode],
+                    (room, aiId, resource) => handleAIResourceCollection(room, aiId, resource)
+                );
+
+                // Emit updated positions to all clients
+                io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
+            }, 100); // Update AI 10 times per second
+        }
 
         io.to(roomCode).emit('gameStarted');
     });
@@ -442,15 +572,20 @@ io.on('connection', (socket) => {
             case 'restart':
                 console.log(`${playerName} requested to restart the game in room ${roomCode}`);
 
+                // Reset all player scores including AI
                 for (const playerId in rooms[roomCode].players) {
                     rooms[roomCode].players[playerId].score = 0;
                 }
 
+                // Clear resources
                 rooms[roomCode].resources = [];
+
+                // Clear existing timer interval
                 if (rooms[roomCode].timerInterval) {
                     clearInterval(rooms[roomCode].timerInterval);
                 }
 
+                // Reset game state
                 rooms[roomCode].inGame = true;
                 rooms[roomCode].startTime = Date.now();
                 rooms[roomCode].pausedAt = null;
@@ -458,10 +593,39 @@ io.on('connection', (socket) => {
                 rooms[roomCode].paused = false;
                 rooms[roomCode].duration = 60 * 1000;
 
+                // Generate new labyrinth based on difficulty
                 const difficulty = (rooms[roomCode].settings.difficulty || 'Easy').toLowerCase();
                 const labyrinthLayout = generateLabyrinth(difficulty);
                 rooms[roomCode].labyrinthLayout = labyrinthLayout;
                 io.to(roomCode).emit('labyrinthLayout', labyrinthLayout);
+
+                // Reset AI players if in single player mode
+                if (rooms[roomCode].settings.gameMode === 'SinglePlayer' && rooms[roomCode].aiPlayers) {
+                    // Reset AI players using AIController
+                    rooms[roomCode] = AIController.resetAIPlayers(rooms[roomCode]);
+
+                    // Restart AI interval
+                    if (rooms[roomCode].aiInterval) {
+                        clearInterval(rooms[roomCode].aiInterval);
+                    }
+
+                    rooms[roomCode].aiInterval = setInterval(() => {
+                        if (rooms[roomCode].paused) return;
+                        if (!rooms[roomCode].inGame) {
+                            clearInterval(rooms[roomCode].aiInterval);
+                            return;
+                        }
+
+                        // Update AI players
+                        rooms[roomCode] = AIController.updateAIPlayers(
+                            rooms[roomCode],
+                            (room, aiId, resource) => handleAIResourceCollection(room, aiId, resource)
+                        );
+
+                        // Emit updated positions
+                        io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
+                    }, 100);
+                }
 
                 const resetScores = {};
                 for (const [id, playerObj] of Object.entries(rooms[roomCode].players)) {
@@ -473,6 +637,7 @@ io.on('connection', (socket) => {
                     resetScores: resetScores
                 });
 
+                // Set up new timer interval
                 rooms[roomCode].timerInterval = setInterval(() => {
                     if (rooms[roomCode].paused) return;
 
@@ -483,6 +648,12 @@ io.on('connection', (socket) => {
                     if (timeLeft <= 0) {
                         clearInterval(rooms[roomCode].timerInterval);
 
+                        // Clear AI interval if it exists
+                        if (rooms[roomCode].aiInterval) {
+                            clearInterval(rooms[roomCode].aiInterval);
+                        }
+
+                        // Find the winner
                         let highestScore = -1;
                         let winner = null;
 
@@ -519,19 +690,29 @@ io.on('connection', (socket) => {
                         }
                     }
                 }, 1000);
-
                 break;
             case 'quit':
                 if (rooms[roomCode].moderator !== socket.id) {
                     socket.leave(roomCode);
                     delete rooms[roomCode].players[socket.id];
                     console.log(`Non-moderator ${playerName} quitting room ${roomCode}`);
-                    socket.emit('gameQuit', { message: `${playerName} quit the game.` });
+                    socket.emit('gameQuit', { message: `You quit the game.` });
                     io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
                     io.to(roomCode).emit('playerLeft', { message: `${playerName} left the game.` });
                 } else {
+                    // Clean up intervals if moderator quits
+                    if (rooms[roomCode].timerInterval) {
+                        clearInterval(rooms[roomCode].timerInterval);
+                    }
+                    if (rooms[roomCode].aiInterval) {
+                        clearInterval(rooms[roomCode].aiInterval);
+                    }
+
                     console.log(`Moderator ${playerName} requested to quit room ${roomCode}`);
-                    io.to(roomCode).emit('gameQuit', { message: `${playerName} quit the game.` });
+                    io.to(roomCode).emit('gameQuit', { message: `${playerName} quit the game. Game ended.` });
+
+                    // Optionally delete the room if moderator quits
+                    delete rooms[roomCode];
                 }
                 break;
             default:
@@ -539,7 +720,6 @@ io.on('connection', (socket) => {
                 break;
         }
     });
-
 });
 
 server.listen(PORT, () => {

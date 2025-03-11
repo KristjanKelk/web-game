@@ -13,6 +13,47 @@
     <p id="roomInfo"></p>
     <ul id="playersList"></ul>
 
+    <!-- Game Mode Selection (Moderator Only) -->
+    <fieldset id="gameModePanel" style="display: none;">
+        <legend>Game Mode (Moderator Only)</legend>
+
+        <div class="radio-options">
+            <label>
+                <input type="radio" name="gameMode" value="Multiplayer" checked> Multiplayer
+            </label>
+            <label>
+                <input type="radio" name="gameMode" value="SinglePlayer"> Single Player
+            </label>
+        </div>
+
+        <button id="saveGameModeBtn">Save Game Mode</button>
+        <p id="gameModeErrorMsg" class="error"></p>
+    </fieldset>
+
+    <!-- AI Settings (Moderator Only, visible in Single Player mode) -->
+    <fieldset id="aiSettingsPanel" style="display: none;">
+        <legend>AI Opponents (Moderator Only)</legend>
+
+        <label for="aiOpponentsSelect">Number of AI Opponents:</label>
+        <select id="aiOpponentsSelect">
+            <option value="1">1 Opponent</option>
+            <option value="2">2 Opponents</option>
+            <option value="3">3 Opponents</option>
+        </select>
+        <br /><br />
+
+        <label for="aiDifficultySelect">AI Difficulty:</label>
+        <select id="aiDifficultySelect">
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+        </select>
+        <br /><br />
+
+        <button id="saveAISettingsBtn">Save AI Settings</button>
+        <p id="aiSettingsErrorMsg" class="error"></p>
+    </fieldset>
+
     <!-- Game Settings (Moderator Only) -->
     <fieldset id="gameSettingsPanel" style="display: none;">
         <legend>Game Settings (Moderator Only)</legend>
@@ -37,7 +78,12 @@
     <!-- Display settings to non-moderators (read-only) -->
     <div id="displaySettings" style="margin-top: 20px; display: none;">
         <h3>Current Settings</h3>
-        <p>Difficulty: <span id="displayDifficulty"></span></p>
+        <p>Game Mode: <span id="displayGameMode">Multiplayer</span></p>
+        <div id="aiSettingsDisplay" style="display: none;">
+            <p>AI Opponents: <span id="displayAIOpponents">1</span></p>
+            <p>AI Difficulty: <span id="displayAIDifficulty">Medium</span></p>
+        </div>
+        <p>Game Difficulty: <span id="displayDifficulty"></span></p>
     </div>
 
     <p id="lobbyErrorMsg"></p>
