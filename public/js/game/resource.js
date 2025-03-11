@@ -1,4 +1,4 @@
-// public/js/game/resource.js - Updated ResourceManager class
+// public/js/game/resource.js - Optimized ResourceManager class
 
 export class ResourceManager {
     constructor(board, socket, roomCode, playerName, updateScoreCallback) {
@@ -9,6 +9,11 @@ export class ResourceManager {
         this.updateScore = updateScoreCallback;
         this.resourcesOnScreen = {}; // Object to track resource DOM elements
 
+        // Store the bound methods to improve performance with event listeners
+        this.handleResourceSpawned = this.spawnResource.bind(this);
+        this.handleResourceRemoved = this.removeResource.bind(this);
+        this.handleAICollectedResource = this.handleAICollection.bind(this);
+
         // Initialize the resource event handlers
         this.init();
     }
@@ -16,22 +21,21 @@ export class ResourceManager {
     // Listen for all resource-related events from the server
     init() {
         // Resource spawning
-        this.socket.on('resourceSpawned', (resource) => {
-            this.spawnResource(resource);
-        });
+        this.socket.on('resourceSpawned', this.handleResourceSpawned);
 
         // Resource removal (from any source)
-        this.socket.on('resourceRemoved', (resourceId) => {
-            this.removeResource(resourceId);
-        });
+        this.socket.on('resourceRemoved', this.handleResourceRemoved);
 
         // AI resource collection for visual feedback
-        this.socket.on('aiCollectedResource', (data) => {
-            this.handleAICollection(data);
-        });
+        this.socket.on('aiCollectedResource', this.handleAICollectedResource);
     }
 
     spawnResource(resource) {
+        // Skip if resource already exists (prevent duplicates)
+        if (this.resourcesOnScreen[resource.id]) {
+            return;
+        }
+
         // Create a DOM element for the resource
         const resEl = document.createElement('div');
         resEl.classList.add('resource');
@@ -55,25 +59,25 @@ export class ResourceManager {
     removeResource(resourceId) {
         // Check if this resource exists in our tracking object
         if (this.resourcesOnScreen[resourceId]) {
-            console.log(`Removing resource ${resourceId} from screen`);
-
-            try {
-                // Only remove if it's actually in the DOM
-                if (this.resourcesOnScreen[resourceId].parentNode === this.board) {
-                    this.board.removeChild(this.resourcesOnScreen[resourceId]);
+            // Only remove if it's actually in the DOM
+            const element = this.resourcesOnScreen[resourceId];
+            if (element.parentNode === this.board) {
+                try {
+                    this.board.removeChild(element);
+                } catch (e) {
+                    console.error("Error removing resource from DOM:", e);
                 }
-            } catch (e) {
-                console.error("Error removing resource from DOM:", e);
             }
 
-            // Always delete from tracking object
+            // Delete from tracking object
             delete this.resourcesOnScreen[resourceId];
         }
     }
 
     // Handle visual feedback for AI collection
     handleAICollection(data) {
-        console.log(`AI ${data.aiName} collected resource ${data.resourceId}`);
+        // Ensure resource is removed from screen first to prevent flickering
+        this.removeResource(data.resourceId);
 
         // Create a visual indicator
         const indicator = document.createElement('div');
@@ -99,13 +103,15 @@ export class ResourceManager {
                 this.board.removeChild(indicator);
             }
         }, 1000);
-
-        // Ensure resource is removed from screen
-        this.removeResource(data.resourceId);
     }
 
     // Check for collisions between the player and resources
     checkCollisions(playerAvatar) {
+        // Skip if no resources on screen
+        if (Object.keys(this.resourcesOnScreen).length === 0) {
+            return;
+        }
+
         const avatarRect = playerAvatar.getBoundingClientRect();
         // Add a small buffer for more forgiving collision detection
         const buffer = 5;
@@ -116,7 +122,13 @@ export class ResourceManager {
             bottom: avatarRect.bottom + buffer
         };
 
-        for (const resourceId in this.resourcesOnScreen) {
+        // Use Object.keys to prevent potential issues with object modification during iteration
+        const resourceIds = Object.keys(this.resourcesOnScreen);
+        for (let i = 0; i < resourceIds.length; i++) {
+            const resourceId = resourceIds[i];
+            // Skip if resource was removed during iteration
+            if (!this.resourcesOnScreen[resourceId]) continue;
+
             const resEl = this.resourcesOnScreen[resourceId];
             const resourceRect = resEl.getBoundingClientRect();
 
@@ -144,8 +156,18 @@ export class ResourceManager {
 
     // Clear all resources (used for restart/reset)
     clearResources() {
-        for (const resourceId in this.resourcesOnScreen) {
-            this.removeResource(resourceId);
+        // Use Object.keys to get a stable list for iteration
+        const resourceIds = Object.keys(this.resourcesOnScreen);
+        for (let i = 0; i < resourceIds.length; i++) {
+            this.removeResource(resourceIds[i]);
         }
+    }
+
+    // Clean up event listeners when no longer needed
+    destroy() {
+        this.socket.off('resourceSpawned', this.handleResourceSpawned);
+        this.socket.off('resourceRemoved', this.handleResourceRemoved);
+        this.socket.off('aiCollectedResource', this.handleAICollectedResource);
+        this.clearResources();
     }
 }

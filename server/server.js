@@ -1,3 +1,4 @@
+// server/server.js with changes to use exported functions
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -70,6 +71,8 @@ function startGameTimer(roomCode) {
             if (rooms[roomCode].aiInterval) {
                 clearInterval(rooms[roomCode].aiInterval);
             }
+            // Stop resource spawning when game ends
+            resourceController.stopResourceSpawning(rooms[roomCode]);
             determineGameResults(roomCode);
         }
     }, 1000);
@@ -165,8 +168,8 @@ function handleGameRestart(roomCode, playerName) {
         rooms[roomCode].players[playerId].score = 0;
     }
 
-    // Clear resources
-    rooms[roomCode].resources = [];
+    // Use the clearResources function from resourceController
+    resourceController.clearResources(rooms[roomCode], io);
 
     // Clear existing intervals
     if (rooms[roomCode].timerInterval) {
@@ -202,6 +205,9 @@ function handleGameRestart(roomCode, playerName) {
 
     // Start game timer
     startGameTimer(roomCode);
+
+    // Restart resource spawning
+    resourceController.startResourceSpawning(roomCode, rooms[roomCode], io);
 }
 
 /**
@@ -223,6 +229,8 @@ function handlePlayerQuit(roomCode, socketId, playerName) {
         if (rooms[roomCode].aiInterval) {
             clearInterval(rooms[roomCode].aiInterval);
         }
+        // Stop resource spawning using the exported function
+        resourceController.stopResourceSpawning(rooms[roomCode]);
         console.log(`Moderator ${playerName} requested to quit room ${roomCode}`);
         io.to(roomCode).emit('gameQuit', { message: `${playerName} quit the game. Game ended.` });
         delete rooms[roomCode];
@@ -464,6 +472,21 @@ io.on('connection', (socket) => {
             rooms[roomCode].positions = {};
         }
 
+        // Use labyrinthGenerator.isInsideWall to prevent player from moving into walls
+        if (rooms[roomCode].labyrinthLayout && rooms[roomCode].labyrinthLayout.length > 0) {
+            // Check if the new position would be inside a wall
+            const isInWall = labyrinthGenerator.isInsideWall(
+                position.x,
+                position.y,
+                rooms[roomCode].labyrinthLayout
+            );
+
+            // If in wall, don't update position (server-side validation)
+            if (isInWall) {
+                return;
+            }
+        }
+
         rooms[roomCode].positions[socket.id] = { playerName, position };
         io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
     });
@@ -527,6 +550,8 @@ io.on('connection', (socket) => {
                 io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
 
                 if (Object.keys(rooms[roomCode].players).length === 0 && !rooms[roomCode].inGame) {
+                    // If this was the last player in a room, ensure resources are properly stopped
+                    resourceController.stopResourceSpawning(rooms[roomCode]);
                     delete rooms[roomCode];
                     console.log(`Room ${roomCode} deleted due to inactivity.`);
                 }
