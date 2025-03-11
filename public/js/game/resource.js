@@ -12,7 +12,7 @@ export class ResourceManager {
         // Store the bound methods to improve performance with event listeners
         this.handleResourceSpawned = this.spawnResource.bind(this);
         this.handleResourceRemoved = this.removeResource.bind(this);
-        this.handleAICollectedResource = this.handleAICollection.bind(this);
+        this.handleNPCCollectedResource = this.handleNPCCollection.bind(this);
 
         // Initialize the resource event handlers
         this.init();
@@ -26,8 +26,8 @@ export class ResourceManager {
         // Resource removal (from any source)
         this.socket.on('resourceRemoved', this.handleResourceRemoved);
 
-        // AI resource collection for visual feedback
-        this.socket.on('aiCollectedResource', this.handleAICollectedResource);
+        // NPC resource collection for visual feedback
+        this.socket.on('NPCCollectedResource', this.handleNPCCollectedResource);
     }
 
     spawnResource(resource) {
@@ -74,14 +74,14 @@ export class ResourceManager {
         }
     }
 
-    // Handle visual feedback for AI collection
-    handleAICollection(data) {
+    // Handle visual feedback for NPC collection
+    handleNPCCollection(data) {
         // Ensure resource is removed from screen first to prevent flickering
         this.removeResource(data.resourceId);
 
         // Create a visual indicator
         const indicator = document.createElement('div');
-        indicator.className = 'ai-collection-indicator';
+        indicator.className = 'NPC-collection-indicator';
         indicator.textContent = '+10';
         indicator.style.position = 'absolute';
         indicator.style.left = data.position.x + 'px';
@@ -167,7 +167,7 @@ export class ResourceManager {
     destroy() {
         this.socket.off('resourceSpawned', this.handleResourceSpawned);
         this.socket.off('resourceRemoved', this.handleResourceRemoved);
-        this.socket.off('aiCollectedResource', this.handleAICollectedResource);
+        this.socket.off('NPCCollectedResource', this.handleNPCCollectedResource);
         this.clearResources();
     }
 }

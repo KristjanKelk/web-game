@@ -158,30 +158,30 @@ function handleResourceCollected(room, data, io, updateScoresCallback) {
 }
 
 /**
- * Handles an AI player collecting a resource
+ * Handles an NPC player collecting a resource
  * @param {Object} room - The room object
- * @param {string} aiId - The AI player ID
+ * @param {string} NPCId - The NPC player ID
  * @param {Object} resource - The collected resource
  * @param {Object} io - Socket.io instance
  * @param {Function} updateScoresCallback - Function to update scores
  */
-function handleAIResourceCollected(room, aiId, resource, io, updateScoresCallback) {
+function handleNPCResourceCollected(room, NPCId, resource, io, updateScoresCallback) {
     if (!room || !room.resources || !resource) return room;
 
     // Remove the resource
     room.resources = room.resources.filter(r => r.id !== resource.id);
     io.to(room.roomCode).emit('resourceRemoved', resource.id);
 
-    // Award points to AI
-    if (room.players[aiId]) {
-        room.players[aiId].score += 10;
+    // Award points to NPC
+    if (room.players[NPCId]) {
+        room.players[NPCId].score += 10;
     }
 
     // Handle power-up effects
     if (resource.type === 'powerup') {
-        const aiPlayerName = room.players[aiId].name;
+        const NPCPlayerName = room.players[NPCId].name;
         io.to(room.roomCode).emit('powerUpEffect', {
-            source: aiPlayerName,
+            source: NPCPlayerName,
             effect: 'slow',
             duration: 5000
         });
@@ -223,6 +223,6 @@ module.exports = {
     startResourceSpawning,
     stopResourceSpawning,
     handleResourceCollected,
-    handleAIResourceCollected,
+    handleNPCResourceCollected,
     clearResources
 };

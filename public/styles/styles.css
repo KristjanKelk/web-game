@@ -229,7 +229,7 @@ h2, h3 {
     box-shadow: none !important;
 }
 
-/* AI and Game Mode specific styles */
+/* NPC and Game Mode specific styles */
 
 /* Radio option container */
 .radio-options {
@@ -249,8 +249,8 @@ h2, h3 {
     margin: 0;
 }
 
-/* AI settings panel */
-#aiSettingsPanel {
+/* NPC settings panel */
+#NPCSettingsPanel {
     margin-top: 15px;
     padding: 15px;
     border: 1px solid #ff9900;
@@ -258,7 +258,7 @@ h2, h3 {
     background: #333;
 }
 
-#aiSettingsPanel legend {
+#NPCSettingsPanel legend {
     color: #ff9900;
     padding: 0 10px;
 }
@@ -296,14 +296,14 @@ h2, h3 {
     padding: 0 10px;
 }
 
-/* AI indicator in player list */
-#playersList li span.ai-player {
+/* NPC indicator in player list */
+#playersList li span.NPC-player {
     color: #ff9900;
     font-style: italic;
 }
 
-/* AI settings in display section */
-#aiSettingsDisplay {
+/* NPC settings in display section */
+#NPCSettingsDisplay {
     margin-top: 8px;
     padding: 8px;
     background: #3a3a3a;
@@ -320,11 +320,11 @@ h2, h3 {
     background: #ff9999;
 }
 
-#saveAISettingsBtn {
+#saveNPCSettingsBtn {
     background: #ff9900;
 }
 
-#saveAISettingsBtn:hover {
+#saveNPCSettingsBtn:hover {
     background: #ffad33;
 }
 
@@ -337,4 +337,250 @@ h2, h3 {
         opacity: 0;
         transform: translateY(-20px);
     }
+}
+
+/* Add these styles to your styles.css file */
+
+/* Lobby container */
+.lobby-box {
+    background: #222;
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.lobby-box h2 {
+    margin-top: 0;
+    color: #0ff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+}
+
+/* Mode buttons */
+.mode-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    background: #333;
+    color: #fff;
+    border: 2px solid #0ff;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 1;
+    max-width: 200px;
+}
+
+.mode-btn:hover {
+    background: #444;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.mode-btn.active {
+    background: #0ff;
+    color: #000;
+    font-weight: bold;
+}
+
+/* Game settings panel */
+#gameSettingsPanel {
+    background: #222;
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+#gameSettingsPanel h3 {
+    color: #0ff;
+    margin-top: 0;
+}
+
+/* Settings for different modes */
+.multiplayer-active .multiplayer-settings {
+    display: block;
+}
+
+.multiplayer-active .singleplayer-settings {
+    display: none;
+}
+
+.singleplayer-active .multiplayer-settings {
+    display: none;
+}
+
+.singleplayer-active .singleplayer-settings {
+    display: block;
+}
+
+/* Setting groups */
+.setting-group {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.setting-group label {
+    min-width: 150px;
+    color: #ddd;
+}
+
+.setting-group select {
+    flex: 1;
+    max-width: 200px;
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+
+.setting-note {
+    color: #aaa;
+    font-style: italic;
+    margin-top: 10px;
+}
+
+/* Action buttons */
+.control-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 25px 0;
+}
+
+.action-btn {
+    padding: 12px 25px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.multi-player-btn, .single-player-btn {
+    background: #0066cc;
+    color: white;
+}
+
+.multi-player-btn:hover, .single-player-btn:hover {
+    background: #0088ff;
+    box-shadow: 0 0 15px rgba(0, 136, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.leave-btn {
+    background: rgba(150, 0, 0, 0.8);
+    color: white;
+}
+
+.leave-btn:hover {
+    background: rgba(200, 0, 0, 0.9);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.disabled-btn {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.disabled-btn:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Current settings display */
+.current-settings {
+    background: #222;
+    border: 1px solid #0ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.current-settings h3 {
+    margin-top: 0;
+    color: #0ff;
+    text-align: center;
+}
+
+.setting-display {
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 15px;
+    border-radius: 4px;
+}
+
+.setting-label {
+    font-weight: bold;
+    color: #ddd;
+}
+
+.setting-value {
+    color: #0ff;
+}
+
+/* Player list */
+#playersList {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#playersList li {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 5px;
+    border-radius: 4px;
+    border-left: 3px solid #0ff;
+    transition: background 0.2s ease;
+}
+
+#playersList li:hover {
+    background: rgba(0, 255, 255, 0.1);
+}
+
+#playersList li.NPC-player {
+    border-left: 3px solid #ff9900;
+}
+
+/* Room info */
+#roomInfo {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 15px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 20px;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    color: #0ff;
+}
+
+#playersList li.preview-bot {
+    border-left: 3px dashed #ff9900;
+    background-color: rgba(255, 153, 0, 0.1);
+    position: relative;
+}
+
+#playersList li.preview-bot::after {
+    content: "(Preview)";
+    position: absolute;
+    right: 10px;
+    font-size: 0.8em;
+    color: #ff9900;
+    opacity: 0.7;
 }

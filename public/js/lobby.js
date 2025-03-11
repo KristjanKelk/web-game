@@ -1,11 +1,22 @@
-// public/js/lobby.js
+// public/js/lobby.js - Debugged Version
 const socket = io();
 
 const roomCode = localStorage.getItem('roomCode');
 const playerName = localStorage.getItem('playerName');
 
+// Debug function
+function debug(message) {
+    console.log(`[DEBUG] ${message}`);
+}
+
+debug("Script starting...");
+
 // Get DOM elements with null checks
-const getElement = (id) => document.getElementById(id);
+const getElement = (id) => {
+    const element = document.getElementById(id);
+    if (!element) debug(`Element with ID '${id}' not found!`);
+    return element;
+};
 
 const roomInfo = getElement('roomInfo');
 const playersList = getElement('playersList');
@@ -13,35 +24,34 @@ const startButton = getElement('startButton');
 const leaveLobbyButton = getElement('leaveLobbyButton');
 const lobbyErrorMsg = getElement('lobbyErrorMsg');
 
-// Settings elements
+// Mode buttons
+const multiplayerBtn = getElement('multiplayerBtn');
+const singlePlayerBtn = getElement('singlePlayerBtn');
+
+// Settings panels and elements
 const gameSettingsPanel = getElement('gameSettingsPanel');
-const saveSettingsBtn = getElement('saveSettingsBtn');
-const settingsErrorMsg = getElement('settingsErrorMsg');
 const difficultySelect = getElement('difficultySelect');
+const saveSettingsBtn = getElement('saveSettingsBtn');
 
-// Game mode elements
-const gameModePanel = getElement('gameModePanel');
-const gameModeRadios = document.getElementsByName('gameMode');
-const saveGameModeBtn = getElement('saveGameModeBtn');
-const gameModeErrorMsg = getElement('gameModeErrorMsg');
-
-// AI settings elements
-const aiSettingsPanel = getElement('aiSettingsPanel');
-const aiOpponentsSelect = getElement('aiOpponentsSelect');
-const aiDifficultySelect = getElement('aiDifficultySelect');
-const saveAISettingsBtn = getElement('saveAISettingsBtn');
-const aiSettingsErrorMsg = getElement('aiSettingsErrorMsg');
+// NPC settings
+const NPCOpponentsSelect = getElement('NPCOpponentsSelect');
+const NPCDifficultySelect = getElement('NPCDifficultySelect');
 
 // Display elements
 const displaySettingsDiv = getElement('displaySettings');
 const displayGameMode = getElement('displayGameMode');
-const aiSettingsDisplay = getElement('aiSettingsDisplay');
-const displayAIOpponents = getElement('displayAIOpponents');
-const displayAIDifficulty = getElement('displayAIDifficulty');
+const NPCSettingsDisplay = getElement('NPCSettingsDisplay');
+const displayNPCOpponents = getElement('displayNPCOpponents');
+const displayNPCDifficulty = getElement('displayNPCDifficulty');
 const displayDifficulty = getElement('displayDifficulty');
 
-// Game mode state
+// Game state
 let currentGameMode = 'Multiplayer';
+let amIModerator = false;
+let previewBots = []; // Store preview bot information
+let realPlayers = []; // Store real players
+
+debug("DOM elements loaded, initializing...");
 
 // Validate roomCode and playerName
 if (!roomCode || !playerName) {
@@ -51,26 +61,35 @@ if (!roomCode || !playerName) {
     }, 3000);
 } else {
     if (roomInfo) roomInfo.textContent = `Room Code: ${roomCode}`;
+    debug(`Joining game with roomCode: ${roomCode}, playerName: ${playerName}`);
     // Join the lobby
     socket.emit('joinGame', { roomCode, playerName });
 }
 
-// Handle join errors from server
-socket.on('joinError', (msg) => {
-    if (lobbyErrorMsg) lobbyErrorMsg.textContent = msg;
-    setTimeout(() => {
-        window.location.href = '/';
-    }, 3000);
-});
+// Show some bots immediately to test - comment this out if not needed
+function forceBotCreation() {
+    debug("*** FORCING BOT CREATION FOR TESTING ***");
+    previewBots = [
+        { name: "BOT-1", isNPC: true, isPreview: true },
+        { name: "BOT-2", isNPC: true, isPreview: true },
+        { name: "BOT-3", isNPC: true, isPreview: true }
+    ];
+    updatePlayerListDisplay();
+}
 
-// Update the player list
-socket.on('updatePlayerList', (players) => {
-    if (!playersList) return;
+// Function to update the player list including real players and preview bots
+function updatePlayerListDisplay() {
+    if (!playersList) {
+        debug("playersList element not found!");
+        return;
+    }
+
+    debug(`Updating player list: ${realPlayers.length} real players, ${previewBots.length} preview bots`);
 
     playersList.innerHTML = '';
 
-    // The first player in 'players' array is always the moderator
-    players.forEach((player, index) => {
+    // Add real players first
+    realPlayers.forEach((player, index) => {
         const li = document.createElement('li');
         let label = player.name;
         if (index === 0) {
@@ -80,218 +99,438 @@ socket.on('updatePlayerList', (players) => {
             label += ' (You)';
         }
 
-        // Add (AI) label if appropriate
-        if (player.isAI) {
-            label += ' (AI)';
+        // Add NPC label if this is a real NPC player
+        if (player.isNPC) {
+            label += ' (NPC)';
+            li.classList.add('NPC-player');
         }
 
         li.textContent = label;
         playersList.appendChild(li);
+        debug(`Added real player: ${label}`);
     });
 
-    const amIModerator = (players.length > 0 && players[0].name === playerName);
-    const otherHumanPlayers = players.filter(p => !p.isAI && p.name !== playerName).length;
+    // Add preview bots if in single player mode
+    if (currentGameMode === 'SinglePlayer' && amIModerator) {
+        debug(`Adding ${previewBots.length} preview bots to player list`);
+        previewBots.forEach(bot => {
+            const li = document.createElement('li');
+            li.textContent = `${bot.name} (NPC)`;
+            li.classList.add('NPC-player', 'preview-bot');
+            playersList.appendChild(li);
+            debug(`Added preview bot: ${bot.name}`);
+        });
+    } else {
+        debug(`Not adding preview bots. currentGameMode=${currentGameMode}, amIModerator=${amIModerator}`);
+    }
+}
 
-    // Show settings panels only if I'm the moderator
-    if (gameModePanel) gameModePanel.style.display = amIModerator ? 'block' : 'none';
-    if (gameSettingsPanel) gameSettingsPanel.style.display = amIModerator ? 'block' : 'none';
-    if (aiSettingsPanel) aiSettingsPanel.style.display = (amIModerator && currentGameMode === 'SinglePlayer') ? 'block' : 'none';
+// Function to create preview NPC bots based on settings
+function updatePreviewBots() {
+    if (!NPCOpponentsSelect) {
+        debug("NPCOpponentsSelect element not found!");
+        return;
+    }
 
-    // Show button only if I'm the moderator
-    if (startButton) {
-        startButton.style.display = amIModerator ? 'inline-block' : 'none';
+    const botCount = parseInt(NPCOpponentsSelect.value);
+    const difficulty = NPCDifficultySelect ? NPCDifficultySelect.value : 'Medium';
 
-        if (amIModerator) {
-            // Set button text based on game mode
-            if (currentGameMode === 'SinglePlayer') {
-                startButton.textContent = 'Start Single-Player Game';
-                startButton.className = 'single-player-btn';
+    debug(`Creating ${botCount} preview bots with difficulty ${difficulty}`);
 
-                // Always enable in single player
-                startButton.disabled = false;
-                startButton.title = '';
-                startButton.classList.remove('disabled-btn');
-            } else {
+    // Create preview bots array
+    previewBots = [];
+    for (let i = 0; i < botCount; i++) {
+        previewBots.push({
+            name: `NPC-${i+1}`,
+            isNPC: true,
+            difficulty: difficulty,
+            isPreview: true
+        });
+    }
+
+    debug(`Created ${previewBots.length} preview bots`);
+
+    // Update the display
+    updatePlayerListDisplay();
+}
+
+// Function to switch game mode
+function switchGameMode(mode) {
+    debug(`Switching game mode to: ${mode}`);
+    currentGameMode = mode;
+
+    // Show appropriate settings
+    if (gameSettingsPanel) {
+        if (mode === 'Multiplayer') {
+            // Show multiplayer settings, hide NPC settings
+            gameSettingsPanel.className = 'multiplayer-active';
+
+            // Update buttons
+            if (multiplayerBtn) multiplayerBtn.classList.add('active');
+            if (singlePlayerBtn) singlePlayerBtn.classList.remove('active');
+
+            if (startButton) {
                 startButton.textContent = 'Start Multiplayer Game';
-                startButton.className = 'multi-player-btn';
-
-                // Disable button if fewer than 2 human players in multiplayer
-                if (otherHumanPlayers < 1) {
-                    startButton.disabled = true;
-                    startButton.title = 'At least 2 human players are required to start multiplayer';
-                    startButton.classList.add('disabled-btn');
-                } else {
-                    startButton.disabled = false;
-                    startButton.title = '';
-                    startButton.classList.remove('disabled-btn');
-                }
+                startButton.className = 'action-btn multi-player-btn';
+                updateStartButtonState();
             }
+
+            // Clear preview bots in multiplayer mode
+            previewBots = [];
+            debug("Cleared preview bots for multiplayer mode");
+        } else {
+            // Hide multiplayer settings, show NPC settings
+            gameSettingsPanel.className = 'singleplayer-active';
+
+            // Update buttons
+            if (multiplayerBtn) multiplayerBtn.classList.remove('active');
+            if (singlePlayerBtn) singlePlayerBtn.classList.add('active');
+
+            if (startButton) {
+                startButton.textContent = 'Start Single-Player Game';
+                startButton.className = 'action-btn single-player-btn';
+                startButton.disabled = false;
+                startButton.classList.remove('disabled-btn');
+            }
+
+            // Create preview bots
+            updatePreviewBots();
         }
     }
 
-    // Show the read-only display for everyone
-    if (displaySettingsDiv) displaySettingsDiv.style.display = 'block';
+    // Update display text
+    if (displayGameMode) displayGameMode.textContent = mode;
+
+    // Update display sections
+    if (NPCSettingsDisplay) {
+        NPCSettingsDisplay.style.display = mode === 'SinglePlayer' ? 'block' : 'none';
+    }
+
+    // Update the player list display
+    updatePlayerListDisplay();
+
+    // Send update to server
+    debug(`Sending updateGameMode to server: ${mode}`);
+    socket.emit('updateGameMode', {
+        roomCode,
+        gameMode: mode
+    });
+
+    // If switching to SinglePlayer, automatically send NPC settings too
+    if (mode === 'SinglePlayer' && NPCOpponentsSelect && NPCDifficultySelect) {
+        const NPCSettings = {
+            roomCode,
+            NPCOpponents: NPCOpponentsSelect.value,
+            NPCDifficulty: NPCDifficultySelect.value
+        };
+        debug(`Sending NPC settings to server: ${JSON.stringify(NPCSettings)}`);
+        socket.emit('updateNPCSettings', NPCSettings);
+
+        // Also set difficulty to Easy
+        debug("Setting difficulty to Easy for SinglePlayer mode");
+        socket.emit('updateGameSettings', {
+            roomCode,
+            settings: { difficulty: 'Easy' }
+        });
+    }
+}
+
+// Update start button state for multiplayer
+function updateStartButtonState() {
+    if (!startButton || currentGameMode !== 'Multiplayer') return;
+
+    // Count human players
+    const humanPlayers = realPlayers.filter(p => !p.isNPC).length;
+    const otherHumanPlayers = humanPlayers - 1; // Excluding self
+
+    debug(`Updating start button state: ${humanPlayers} human players, ${otherHumanPlayers} other players`);
+
+    if (otherHumanPlayers < 1) {
+        startButton.disabled = true;
+        startButton.classList.add('disabled-btn');
+        debug("Start button disabled: not enough players");
+    } else {
+        startButton.disabled = false;
+        startButton.classList.remove('disabled-btn');
+        debug("Start button enabled");
+    }
+}
+
+// Handle join errors from server
+socket.on('joinError', (msg) => {
+    debug(`Join error received: ${msg}`);
+    if (lobbyErrorMsg) lobbyErrorMsg.textContent = msg;
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 3000);
+});
+
+// Update the player list
+socket.on('updatePlayerList', (players) => {
+    debug(`Received updatePlayerList: ${players.length} players`);
+    debug(`Players: ${JSON.stringify(players)}`);
+
+    // Store real players
+    realPlayers = players;
+
+    // Check if I'm the moderator
+    amIModerator = (players.length > 0 && players[0].name === playerName);
+    debug(`amIModerator: ${amIModerator}`);
+
+    // Show/hide moderator controls
+    const moderatorElements = document.querySelectorAll('.moderator-only');
+    moderatorElements.forEach(el => {
+        el.style.display = amIModerator ? 'block' : 'none';
+    });
+
+    if (startButton) {
+        startButton.style.display = amIModerator ? 'inline-block' : 'none';
+    }
+
+    // Make sure current game mode is properly reflected in UI
+    if (amIModerator) {
+        if (gameSettingsPanel) {
+            gameSettingsPanel.className = currentGameMode === 'Multiplayer' ?
+                'multiplayer-active' : 'singleplayer-active';
+        }
+
+        if (multiplayerBtn && singlePlayerBtn) {
+            multiplayerBtn.classList.toggle('active', currentGameMode === 'Multiplayer');
+            singlePlayerBtn.classList.toggle('active', currentGameMode === 'SinglePlayer');
+        }
+
+        // If in SinglePlayer mode, ensure preview bots are shown
+        if (currentGameMode === 'SinglePlayer') {
+            debug("Currently in SinglePlayer mode as moderator, updating preview bots");
+            updatePreviewBots();
+        }
+    }
+
+    // Update player list display
+    updatePlayerListDisplay();
+
+    // Update start button state
+    updateStartButtonState();
+
+    // Show settings display for everyone
+    if (displaySettingsDiv) {
+        displaySettingsDiv.style.display = 'block';
+    }
 });
 
 // Game settings update handler
 socket.on('settingsUpdated', (settings) => {
-    if (displayDifficulty) displayDifficulty.textContent = settings.difficulty;
+    debug(`Received settingsUpdated: ${JSON.stringify(settings)}`);
+    if (displayDifficulty) {
+        displayDifficulty.textContent = settings.difficulty;
+    }
+
+    // Update the select element value
+    if (difficultySelect) {
+        difficultySelect.value = settings.difficulty;
+    }
 });
 
 // Game mode update handler
 socket.on('gameModeUpdated', (data) => {
+    debug(`Received gameModeUpdated: ${JSON.stringify(data)}`);
     currentGameMode = data.gameMode;
 
-    if (displayGameMode) displayGameMode.textContent = data.gameMode;
+    // Update display
+    if (displayGameMode) {
+        displayGameMode.textContent = data.gameMode;
+    }
 
-    // Show/hide AI settings based on game mode
-    if (aiSettingsDisplay) aiSettingsDisplay.style.display = currentGameMode === 'SinglePlayer' ? 'block' : 'none';
+    // Update UI elements
+    if (gameSettingsPanel) {
+        gameSettingsPanel.className = data.gameMode === 'Multiplayer' ?
+            'multiplayer-active' : 'singleplayer-active';
+    }
 
-    // Update moderator controls
-    if (playersList && playersList.children.length > 0 && playersList.children[0].textContent.includes('(You)')) {
-        if (aiSettingsPanel) aiSettingsPanel.style.display = currentGameMode === 'SinglePlayer' ? 'block' : 'none';
+    if (multiplayerBtn && singlePlayerBtn) {
+        multiplayerBtn.classList.toggle('active', data.gameMode === 'Multiplayer');
+        singlePlayerBtn.classList.toggle('active', data.gameMode === 'SinglePlayer');
+    }
 
-        // Update start button
-        if (startButton) {
-            if (currentGameMode === 'SinglePlayer') {
-                startButton.textContent = 'Start Single-Player Game';
-                startButton.className = 'single-player-btn';
-                startButton.disabled = false;
-                startButton.title = '';
-                startButton.classList.remove('disabled-btn');
-            } else {
-                startButton.textContent = 'Start Multiplayer Game';
-                startButton.className = 'multi-player-btn';
+    // Show/hide appropriate settings displays
+    if (NPCSettingsDisplay) {
+        NPCSettingsDisplay.style.display = data.gameMode === 'SinglePlayer' ? 'block' : 'none';
+    }
 
-                // Check if we have enough human players
-                const humanPlayers = Array.from(playersList.children)
-                    .filter(li => !li.textContent.includes('(AI)'))
-                    .length;
+    // Update start button
+    if (startButton && amIModerator) {
+        if (data.gameMode === 'SinglePlayer') {
+            startButton.textContent = 'Start Single-Player Game';
+            startButton.className = 'action-btn single-player-btn';
+            startButton.disabled = false;
+            startButton.classList.remove('disabled-btn');
 
-                if (humanPlayers < 2) {
-                    startButton.disabled = true;
-                    startButton.title = 'At least 2 human players are required to start multiplayer';
-                    startButton.classList.add('disabled-btn');
-                } else {
-                    startButton.disabled = false;
-                    startButton.title = '';
-                    startButton.classList.remove('disabled-btn');
-                }
-            }
+            // Create preview bots when switching to SinglePlayer
+            debug("Switching to SinglePlayer mode, updating preview bots");
+            updatePreviewBots();
+        } else {
+            startButton.textContent = 'Start Multiplayer Game';
+            startButton.className = 'action-btn multi-player-btn';
+            updateStartButtonState();
+
+            // Clear preview bots in multiplayer mode
+            previewBots = [];
+            debug("Switching to Multiplayer mode, cleared preview bots");
         }
     }
 
-    // Also update radio button selection
-    for (const radio of gameModeRadios) {
-        if (radio) radio.checked = radio.value === currentGameMode;
-    }
+    // Update player list display
+    updatePlayerListDisplay();
 });
 
-// AI settings update handler
-socket.on('aiSettingsUpdated', (settings) => {
-    if (displayAIOpponents) displayAIOpponents.textContent = settings.aiOpponents;
-    if (displayAIDifficulty) displayAIDifficulty.textContent = settings.aiDifficulty;
+// NPC settings update handler
+socket.on('NPCSettingsUpdated', (settings) => {
+    debug(`Received NPCSettingsUpdated: ${JSON.stringify(settings)}`);
+    if (displayNPCOpponents) {
+        displayNPCOpponents.textContent = settings.NPCOpponents;
+    }
+
+    if (displayNPCDifficulty) {
+        displayNPCDifficulty.textContent = settings.NPCDifficulty;
+    }
 
     // Update form values
-    if (aiOpponentsSelect) aiOpponentsSelect.value = settings.aiOpponents;
-    if (aiDifficultySelect) aiDifficultySelect.value = settings.aiDifficulty;
+    if (NPCOpponentsSelect) {
+        NPCOpponentsSelect.value = settings.NPCOpponents;
+    }
+
+    if (NPCDifficultySelect) {
+        NPCDifficultySelect.value = settings.NPCDifficulty;
+    }
+
+    // Update preview bots if in single player mode
+    if (currentGameMode === 'SinglePlayer') {
+        debug("NPC settings updated, refreshing preview bots");
+        updatePreviewBots();
+    }
 });
 
-// Error handlers
-socket.on('settingsError', (msg) => {
-    if (settingsErrorMsg) settingsErrorMsg.textContent = msg;
-});
+// Event listeners for mode buttons
+if (multiplayerBtn) {
+    multiplayerBtn.addEventListener('click', () => {
+        debug("Multiplayer button clicked");
+        if (amIModerator) {
+            switchGameMode('Multiplayer');
+        } else {
+            debug("Not moderator, can't switch mode");
+        }
+    });
+}
 
-socket.on('gameModeError', (msg) => {
-    if (gameModeErrorMsg) gameModeErrorMsg.textContent = msg;
-});
+if (singlePlayerBtn) {
+    singlePlayerBtn.addEventListener('click', () => {
+        debug("SinglePlayer button clicked");
+        if (amIModerator) {
+            switchGameMode('SinglePlayer');
+        } else {
+            debug("Not moderator, can't switch mode");
+        }
+    });
+}
 
-socket.on('aiSettingsError', (msg) => {
-    if (aiSettingsErrorMsg) aiSettingsErrorMsg.textContent = msg;
-});
-
-// Add event listeners with null checks
+// Save settings (only used for multiplayer difficulty now)
 if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', () => {
-        if (settingsErrorMsg) settingsErrorMsg.textContent = '';
-
-        if (difficultySelect) {
-            const newSettings = {
-                difficulty: difficultySelect.value
+        debug("Save settings button clicked");
+        if (amIModerator && difficultySelect) {
+            const settings = {
+                roomCode,
+                settings: { difficulty: difficultySelect.value }
             };
+            debug(`Sending settings update: ${JSON.stringify(settings)}`);
+            socket.emit('updateGameSettings', settings);
+        } else {
+            debug("Not sending settings: not moderator or difficultySelect missing");
+        }
+    });
+}
 
-            socket.emit('updateGameSettings', {
+// Save NPC settings when changing them
+if (NPCOpponentsSelect) {
+    NPCOpponentsSelect.addEventListener('change', () => {
+        debug(`NPCOpponentsSelect changed to ${NPCOpponentsSelect.value}`);
+        if (amIModerator && currentGameMode === 'SinglePlayer') {
+            const settings = {
                 roomCode,
-                settings: newSettings
-            });
+                NPCOpponents: NPCOpponentsSelect.value,
+                NPCDifficulty: NPCDifficultySelect ? NPCDifficultySelect.value : 'Medium'
+            };
+            debug(`Sending NPC settings update: ${JSON.stringify(settings)}`);
+            socket.emit('updateNPCSettings', settings);
+
+            // Update preview bots
+            debug("Updating preview bots after opponents change");
+            updatePreviewBots();
+        } else {
+            debug("Not sending NPC settings: not moderator or not in SinglePlayer mode");
         }
     });
 }
 
-if (saveGameModeBtn) {
-    saveGameModeBtn.addEventListener('click', () => {
-        if (gameModeErrorMsg) gameModeErrorMsg.textContent = '';
-
-        let selectedGameMode = 'Multiplayer';
-        for (const radio of gameModeRadios) {
-            if (radio && radio.checked) {
-                selectedGameMode = radio.value;
-                break;
-            }
-        }
-
-        socket.emit('updateGameMode', {
-            roomCode,
-            gameMode: selectedGameMode
-        });
-    });
-}
-
-if (saveAISettingsBtn) {
-    saveAISettingsBtn.addEventListener('click', () => {
-        if (aiSettingsErrorMsg) aiSettingsErrorMsg.textContent = '';
-
-        if (aiOpponentsSelect && aiDifficultySelect) {
-            socket.emit('updateAISettings', {
+if (NPCDifficultySelect) {
+    NPCDifficultySelect.addEventListener('change', () => {
+        debug(`NPCDifficultySelect changed to ${NPCDifficultySelect.value}`);
+        if (amIModerator && currentGameMode === 'SinglePlayer') {
+            const settings = {
                 roomCode,
-                aiOpponents: aiOpponentsSelect.value,
-                aiDifficulty: aiDifficultySelect.value
-            });
+                NPCOpponents: NPCOpponentsSelect ? NPCOpponentsSelect.value : '1',
+                NPCDifficulty: NPCDifficultySelect.value
+            };
+            debug(`Sending NPC settings update: ${JSON.stringify(settings)}`);
+            socket.emit('updateNPCSettings', settings);
+
+            // Update preview bots
+            debug("Updating preview bots after difficulty change");
+            updatePreviewBots();
+        } else {
+            debug("Not sending NPC settings: not moderator or not in SinglePlayer mode");
         }
     });
 }
 
-// Set initial game mode state when radio buttons change
-for (const radio of gameModeRadios) {
-    if (radio) {
-        radio.addEventListener('change', function() {
-            if (this.checked && aiSettingsPanel) {
-                // Toggle AI settings panel visibility
-                aiSettingsPanel.style.display = this.value === 'SinglePlayer' ? 'block' : 'none';
-            }
-        });
-    }
-}
-
-// Lobby start button (moderator only)
+// Lobby start button
 if (startButton) {
     startButton.addEventListener('click', () => {
+        debug("Start button clicked");
         socket.emit('startGame', roomCode);
     });
 }
 
 socket.on('gameStarted', () => {
+    debug("Game started, redirecting to game.html");
     window.location.href = '/game.html';
 });
 
 socket.on('lobbyClosed', () => {
+    debug("Lobby closed");
     alert('The lobby has been closed by the moderator.');
     window.location.href = '/';
 });
 
 if (leaveLobbyButton) {
     leaveLobbyButton.addEventListener('click', () => {
+        debug("Leave lobby button clicked");
         socket.emit('leaveLobby', roomCode);
         window.location.href = '/';
     });
 }
+
+// Optional: Force create some bots for testing
+// Uncomment this line to test if bots can appear at all
+// setTimeout(forceBotCreation, 2000);
+
+// Debug when DOM is fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+    debug("DOM fully loaded");
+    debug(`Current elements status:
+    - playersList: ${playersList ? 'Found' : 'Not found'}
+    - NPCOpponentsSelect: ${NPCOpponentsSelect ? 'Found' : 'Not found'}
+    - singlePlayerBtn: ${singlePlayerBtn ? 'Found' : 'Not found'}
+    - gameSettingsPanel: ${gameSettingsPanel ? 'Found' : 'Not found'}
+    `);
+});

@@ -295,3 +295,27 @@ body {
         transform: translateY(100vh) rotate(360deg);
     }
 }
+
+/* NPC player styling in scoreboard */
+#playerScores .NPC-player {
+    font-style: italic;
+}
+
+/* Color coding for different NPC players */
+#playerScores .NPC-player-1 {
+    color: #FF5733; /* Reddish orange */
+}
+
+#playerScores .NPC-player-2 {
+    color: #33FF57; /* Green */
+}
+
+#playerScores .NPC-player-3 {
+    color: #faff5d; /* yellow */
+}
+
+/* Highlight current player */
+#playerScores .current-player {
+    font-weight: bold;
+    text-decoration: underline;
+}

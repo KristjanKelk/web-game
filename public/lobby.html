@@ -9,84 +9,89 @@
 </head>
 <body>
 <div id="container">
-    <h1>Game Lobby</h1>
+    <h1>Resource Rush</h1>
     <p id="roomInfo"></p>
-    <ul id="playersList"></ul>
 
-    <!-- Game Mode Selection (Moderator Only) -->
-    <fieldset id="gameModePanel" style="display: none;">
-        <legend>Game Mode (Moderator Only)</legend>
-
-        <div class="radio-options">
-            <label>
-                <input type="radio" name="gameMode" value="Multiplayer" checked> Multiplayer
-            </label>
-            <label>
-                <input type="radio" name="gameMode" value="SinglePlayer"> Single Player
-            </label>
-        </div>
-
-        <button id="saveGameModeBtn">Save Game Mode</button>
-        <p id="gameModeErrorMsg" class="error"></p>
-    </fieldset>
-
-    <!-- AI Settings (Moderator Only, visible in Single Player mode) -->
-    <fieldset id="aiSettingsPanel" style="display: none;">
-        <legend>AI Opponents (Moderator Only)</legend>
-
-        <label for="aiOpponentsSelect">Number of AI Opponents:</label>
-        <select id="aiOpponentsSelect">
-            <option value="1">1 Opponent</option>
-            <option value="2">2 Opponents</option>
-            <option value="3">3 Opponents</option>
-        </select>
-        <br /><br />
-
-        <label for="aiDifficultySelect">AI Difficulty:</label>
-        <select id="aiDifficultySelect">
-            <option value="Easy">Easy</option>
-            <option value="Medium">Medium</option>
-            <option value="Hard">Hard</option>
-        </select>
-        <br /><br />
-
-        <button id="saveAISettingsBtn">Save AI Settings</button>
-        <p id="aiSettingsErrorMsg" class="error"></p>
-    </fieldset>
-
-    <!-- Game Settings (Moderator Only) -->
-    <fieldset id="gameSettingsPanel" style="display: none;">
-        <legend>Game Settings (Moderator Only)</legend>
-
-        <label for="difficultySelect">Difficulty:</label>
-        <select id="difficultySelect">
-            <option value="Easy">Easy</option>
-            <option value="Hard">Hard</option>
-        </select>
-        <br /><br />
-
-        <button id="saveSettingsBtn">Save Settings</button>
-        <p id="settingsErrorMsg" class="error"></p>
-    </fieldset>
-
-    <!-- Moderator-only Start button -->
-    <button id="startButton" class="single-player-btn" style="display: none;">Start Single-Player Game</button>
-
-    <!-- Everyone can leave -->
-    <button id="leaveLobbyButton">Leave Lobby</button>
-
-    <!-- Display settings to non-moderators (read-only) -->
-    <div id="displaySettings" style="margin-top: 20px; display: none;">
-        <h3>Current Settings</h3>
-        <p>Game Mode: <span id="displayGameMode">Multiplayer</span></p>
-        <div id="aiSettingsDisplay" style="display: none;">
-            <p>AI Opponents: <span id="displayAIOpponents">1</span></p>
-            <p>AI Difficulty: <span id="displayAIDifficulty">Medium</span></p>
-        </div>
-        <p>Game Difficulty: <span id="displayDifficulty"></span></p>
+    <div class="lobby-box">
+        <h2>Players</h2>
+        <ul id="playersList"></ul>
     </div>
 
-    <p id="lobbyErrorMsg"></p>
+    <!-- Game Mode Buttons (Moderator Only) -->
+    <div class="mode-buttons moderator-only">
+        <button id="multiplayerBtn" class="mode-btn active">Multiplayer</button>
+        <button id="singlePlayerBtn" class="mode-btn">Single Player</button>
+    </div>
+
+    <!-- Combined Settings Panel (shows different fields based on mode) -->
+    <div id="gameSettingsPanel" class="multiplayer-active moderator-only">
+        <!-- Multiplayer settings -->
+        <div class="multiplayer-settings">
+            <h3>Multiplayer Settings</h3>
+
+            <div class="setting-group">
+                <label for="difficultySelect">Difficulty:</label>
+                <select id="difficultySelect">
+                    <option value="Easy">Easy</option>
+                    <option value="Hard">Hard</option>
+                </select>
+                <button id="saveSettingsBtn">Save</button>
+            </div>
+        </div>
+
+        <!-- Single player settings -->
+        <div class="singleplayer-settings">
+            <h3>NPC Opponents Settings</h3>
+
+            <div class="setting-group">
+                <label for="NPCOpponentsSelect">Number of NPC Opponents:</label>
+                <select id="NPCOpponentsSelect">
+                    <option value="1">1 Opponent</option>
+                    <option value="2">2 Opponents</option>
+                    <option value="3">3 Opponents</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label for="NPCDifficultySelect">NPC Difficulty:</label>
+                <select id="NPCDifficultySelect">
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Buttons Section -->
+    <div class="control-buttons">
+        <!-- Moderator-only Start button -->
+        <button id="startButton" class="action-btn multi-player-btn" style="display: none;">Start Game</button>
+
+        <!-- Everyone can leave -->
+        <button id="leaveLobbyButton" class="action-btn leave-btn">Leave Lobby</button>
+    </div>
+
+    <!-- Display settings to non-moderators (read-only) -->
+    <div id="displaySettings" class="current-settings" style="display: none;">
+        <h3>Current Settings</h3>
+        <p>Game Mode: <span id="displayGameMode">Multiplayer</span></p>
+
+        <!-- NPC settings display for single-player mode -->
+        <div id="NPCSettingsDisplay" style="display: none;">
+            <div class="setting-display">
+                <span class="setting-label">NPC Opponents:</span>
+                <span id="displayNPCOpponents" class="setting-value">1</span>
+            </div>
+            <div class="setting-display">
+                <span class="setting-label">NPC Difficulty:</span>
+                <span id="displayNPCDifficulty" class="setting-value">Medium</span>
+            </div>
+        </div>
+
+    </div>
+
+    <p id="lobbyErrorMsg" class="error"></p>
 </div>
 <script src="/js/lobby.js"></script>
 </body>

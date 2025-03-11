@@ -2,7 +2,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const AIController = require('./ai-controller');
+const NPCController = require('./NPC-controller');
 const resourceController = require('./resourceController');
 const labyrinthGenerator = require('./labyrinthGenerator');
 
@@ -68,8 +68,8 @@ function startGameTimer(roomCode) {
 
         if (timeLeft <= 0) {
             clearInterval(rooms[roomCode].timerInterval);
-            if (rooms[roomCode].aiInterval) {
-                clearInterval(rooms[roomCode].aiInterval);
+            if (rooms[roomCode].NPCInterval) {
+                clearInterval(rooms[roomCode].NPCInterval);
             }
             // Stop resource spawning when game ends
             resourceController.stopResourceSpawning(rooms[roomCode]);
@@ -123,32 +123,32 @@ function determineGameResults(roomCode) {
 }
 
 /**
- * Sets up AI behavior for single-player games
+ * Sets up NPC behavior for single-player games
  * @param {string} roomCode - The room identifier
  */
-function setupAIPlayers(roomCode) {
+function setupNPCPlayers(roomCode) {
     if (!rooms[roomCode] || rooms[roomCode].settings.gameMode !== 'SinglePlayer') return;
 
-    if (rooms[roomCode].aiInterval) {
-        clearInterval(rooms[roomCode].aiInterval);
+    if (rooms[roomCode].NPCInterval) {
+        clearInterval(rooms[roomCode].NPCInterval);
     }
 
-    rooms[roomCode].aiInterval = setInterval(() => {
+    rooms[roomCode].NPCInterval = setInterval(() => {
         if (!rooms[roomCode] || rooms[roomCode].paused || !rooms[roomCode].inGame) {
             if (!rooms[roomCode] || !rooms[roomCode].inGame) {
-                clearInterval(rooms[roomCode].aiInterval);
+                clearInterval(rooms[roomCode].NPCInterval);
             }
             return;
         }
 
         try {
-            rooms[roomCode] = AIController.updateAIPlayers(
+            rooms[roomCode] = NPCController.updateNPCPlayers(
                 rooms[roomCode],
-                (room, aiId, resource) => resourceController.handleAIResourceCollected(room, aiId, resource, io, updateAndBroadcastScores)
+                (room, NPCId, resource) => resourceController.handleNPCResourceCollected(room, NPCId, resource, io, updateAndBroadcastScores)
             );
             io.to(roomCode).emit('playerPositions', rooms[roomCode].positions);
         } catch (error) {
-            console.error("Error in AI update:", error);
+            console.error("Error in NPC update:", error);
         }
     }, 50);
 }
@@ -175,8 +175,8 @@ function handleGameRestart(roomCode, playerName) {
     if (rooms[roomCode].timerInterval) {
         clearInterval(rooms[roomCode].timerInterval);
     }
-    if (rooms[roomCode].aiInterval) {
-        clearInterval(rooms[roomCode].aiInterval);
+    if (rooms[roomCode].NPCInterval) {
+        clearInterval(rooms[roomCode].NPCInterval);
     }
 
     // Generate new labyrinth
@@ -197,10 +197,10 @@ function handleGameRestart(roomCode, playerName) {
         resetScores: resetScores
     });
 
-    // For single-player mode, reset AI
-    if (rooms[roomCode].settings.gameMode === 'SinglePlayer' && rooms[roomCode].aiPlayers) {
-        rooms[roomCode] = AIController.resetAIPlayers(rooms[roomCode]);
-        setupAIPlayers(roomCode);
+    // For single-player mode, reset NPC
+    if (rooms[roomCode].settings.gameMode === 'SinglePlayer' && rooms[roomCode].NPCPlayers) {
+        rooms[roomCode] = NPCController.resetNPCPlayers(rooms[roomCode]);
+        setupNPCPlayers(roomCode);
     }
 
     // Start game timer
@@ -226,8 +226,8 @@ function handlePlayerQuit(roomCode, socketId, playerName) {
         if (rooms[roomCode].timerInterval) {
             clearInterval(rooms[roomCode].timerInterval);
         }
-        if (rooms[roomCode].aiInterval) {
-            clearInterval(rooms[roomCode].aiInterval);
+        if (rooms[roomCode].NPCInterval) {
+            clearInterval(rooms[roomCode].NPCInterval);
         }
         // Stop resource spawning using the exported function
         resourceController.stopResourceSpawning(rooms[roomCode]);
@@ -258,14 +258,14 @@ io.on('connection', (socket) => {
                 difficulty: 'Easy',
                 rounds: 3,
                 gameMode: 'Multiplayer', // Default to multiplayer
-                aiOpponents: 1,          // Default AI opponent count
-                aiDifficulty: 'Medium'
+                NPCOpponents: 1,          // Default NPC opponent count
+                NPCDifficulty: 'Medium'
             },
             inGame: false,
             resources: [],
             positions: {},
             labyrinthLayout: [],
-            aiPlayers: {}
+            NPCPlayers: {}
         };
         socket.emit('gameCreated', { roomCode });
     });
@@ -334,9 +334,9 @@ io.on('connection', (socket) => {
         updateAndBroadcastScores(roomCode);
     });
 
-    // Handle AI Settings update
-    socket.on('updateAISettings', (data) => {
-        const { roomCode, aiOpponents, aiDifficulty } = data;
+    // Handle NPC Settings update
+    socket.on('updateNPCSettings', (data) => {
+        const { roomCode, NPCOpponents, NPCDifficulty } = data;
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -348,12 +348,12 @@ io.on('connection', (socket) => {
             return;
         }
 
-        rooms[roomCode].settings.aiOpponents = aiOpponents;
-        rooms[roomCode].settings.aiDifficulty = aiDifficulty;
+        rooms[roomCode].settings.NPCOpponents = NPCOpponents;
+        rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
 
-        io.to(roomCode).emit('aiSettingsUpdated', {
-            aiOpponents,
-            aiDifficulty
+        io.to(roomCode).emit('NPCSettingsUpdated', {
+            NPCOpponents,
+            NPCDifficulty
         });
     });
 
@@ -394,11 +394,11 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Setup AI players for single-player mode
+        // Setup NPC players for single-player mode
         if (gameMode === 'SinglePlayer') {
-            const aiOpponents = parseInt(rooms[roomCode].settings.aiOpponents);
-            const aiDifficulty = rooms[roomCode].settings.aiDifficulty;
-            rooms[roomCode] = AIController.createAIPlayers(rooms[roomCode], aiOpponents, aiDifficulty);
+            const NPCOpponents = parseInt(rooms[roomCode].settings.NPCOpponents);
+            const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty;
+            rooms[roomCode] = NPCController.createNPCPlayers(rooms[roomCode], NPCOpponents, NPCDifficulty);
             io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
         }
 
@@ -411,9 +411,9 @@ io.on('connection', (socket) => {
         // Start the game timer
         startGameTimer(roomCode);
 
-        // Set up AI behavior for single-player mode
+        // Set up NPC behavior for single-player mode
         if (gameMode === 'SinglePlayer') {
-            setupAIPlayers(roomCode);
+            setupNPCPlayers(roomCode);
         }
 
         // Start resource spawning
