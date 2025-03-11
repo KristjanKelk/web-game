@@ -2,9 +2,9 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const NPCController = require('./NPC-controller');
-const resourceController = require('./resourceController');
-const labyrinthGenerator = require('./labyrinthGenerator');
+const NPCController = require('./npc-controller.js');
+const resourceController = require('./resourceController.js');
+const labyrinthGenerator = require('./labyrinthGenerator.js');
 
 const app = express();
 const PORT = 3000;
@@ -358,8 +358,10 @@ io.on('connection', (socket) => {
     });
 
     // Handle Game Mode update
+    // In server.js, modify the updateGameMode handler:
     socket.on('updateGameMode', (data) => {
         const { roomCode, gameMode } = data;
+        console.log(`Mode update received for room ${roomCode}: ${gameMode}`);
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -372,7 +374,33 @@ io.on('connection', (socket) => {
         }
 
         rooms[roomCode].settings.gameMode = gameMode;
+        console.log(`Updated room ${roomCode} game mode to: ${rooms[roomCode].settings.gameMode}`);
         io.to(roomCode).emit('gameModeUpdated', { gameMode });
+    });
+
+// Also modify the updateNPCSettings handler:
+    socket.on('updateNPCSettings', (data) => {
+        const { roomCode, NPCOpponents, NPCDifficulty } = data;
+        console.log(`NPC settings update for room ${roomCode}: ${NPCOpponents} bots at ${NPCDifficulty} difficulty`);
+
+        if (!rooms[roomCode]) {
+            socket.emit('settingsError', 'Room does not exist.');
+            return;
+        }
+
+        if (rooms[roomCode].moderator !== socket.id) {
+            socket.emit('settingsError', 'Only the moderator can update settings.');
+            return;
+        }
+
+        rooms[roomCode].settings.NPCOpponents = NPCOpponents;
+        rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
+        console.log(`Updated room ${roomCode} NPC settings: ${rooms[roomCode].settings.NPCOpponents} bots at ${rooms[roomCode].settings.NPCDifficulty} difficulty`);
+
+        io.to(roomCode).emit('NPCSettingsUpdated', {
+            NPCOpponents,
+            NPCDifficulty
+        });
     });
 
     // START GAME (Only Moderator)
@@ -386,7 +414,10 @@ io.on('connection', (socket) => {
         }
 
         const gameMode = rooms[roomCode].settings.gameMode;
+        console.log(`Starting game in ${gameMode} mode for room ${roomCode}`);
+
         const playerCount = Object.keys(rooms[roomCode].players).length;
+        console.log(`Current player count: ${playerCount}`);
 
         // Validate player requirements for multiplayer mode
         if (gameMode === 'Multiplayer' && playerCount < 2) {
@@ -396,9 +427,18 @@ io.on('connection', (socket) => {
 
         // Setup NPC players for single-player mode
         if (gameMode === 'SinglePlayer') {
-            const NPCOpponents = parseInt(rooms[roomCode].settings.NPCOpponents);
-            const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty;
-            rooms[roomCode] = NPCController.createNPCPlayers(rooms[roomCode], NPCOpponents, NPCDifficulty);
+            const NPCOpponents = parseInt(rooms[roomCode].settings.NPCOpponents) || 1;
+            const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty || 'Medium';
+            console.log(`Creating ${NPCOpponents} NPCs with difficulty ${NPCDifficulty}`);
+
+            try {
+                rooms[roomCode] = NPCController.createNPCPlayers(rooms[roomCode], NPCOpponents, NPCDifficulty);
+                console.log(`NPCs created. Total players now: ${Object.keys(rooms[roomCode].players).length}`);
+                console.log(`NPC IDs: ${Object.keys(rooms[roomCode].NPCPlayers || {}).join(', ')}`);
+            } catch (error) {
+                console.error("Error creating NPCs:", error);
+            }
+
             io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
         }
 
@@ -447,6 +487,7 @@ io.on('connection', (socket) => {
     // UPDATE GAME SETTINGS
     socket.on('updateGameSettings', (data) => {
         const { roomCode, settings } = data;
+        console.log(`Game settings update for room ${roomCode}:`, settings);
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -458,7 +499,19 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Make sure we don't overwrite the existing gameMode and NPCSettings
+        const gameMode = rooms[roomCode].settings.gameMode;
+        const NPCOpponents = rooms[roomCode].settings.NPCOpponents;
+        const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty;
+
         rooms[roomCode].settings = settings;
+
+        // Restore the gameMode and NPC settings
+        rooms[roomCode].settings.gameMode = gameMode;
+        rooms[roomCode].settings.NPCOpponents = NPCOpponents;
+        rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
+
+        console.log(`Updated room ${roomCode} settings. Game mode is still: ${rooms[roomCode].settings.gameMode}`);
         io.to(roomCode).emit('settingsUpdated', settings);
     });
 
