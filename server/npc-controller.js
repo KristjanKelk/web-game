@@ -31,11 +31,11 @@ function createNPCPlayers(room, numOpponents, difficulty) {
     }
 
     // Determine NPC speed based on difficulty
-    let NPCSpeed = 3; // Default Medium
+    let NPCSpeed = 6; // Default Medium
     if (difficulty === 'Easy') {
-        NPCSpeed = 2;
+        NPCSpeed = 5;
     } else if (difficulty === 'Hard') {
-        NPCSpeed = 4;
+        NPCSpeed = 9;
     }
 
     // Create the specified number of NPC players

@@ -52,7 +52,7 @@ function spawnResourceForRoom(roomCode, room, io) {
             io.to(roomCode).emit('resourceRemoved', resource.id);
 
             // Spawn a new resource if we're below the minimum
-            if (room.resources.length < 3) {
+            if (room.resources.length < 5) {
                 spawnResourceForRoom(roomCode, room, io);
             }
         }
