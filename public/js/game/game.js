@@ -429,9 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update position using transform for better performance
             remotePlayer.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
         }
-
-        // Debug log - uncomment when needed
-        // console.log(`Seen bots this frame: ${seenBots.length}`, botDebugInfo);
     });
 
     // Socket event handlers
@@ -441,8 +438,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('scoresUpdated', (allScores) => {
-        // Debug log - uncomment when needed
-        // console.log("Scores updated:", allScores);
         updatePlayerScores(allScores);
     });
 

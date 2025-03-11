@@ -161,8 +161,6 @@ function setupNPCPlayers(roomCode) {
 function handleGameRestart(roomCode, playerName) {
     if (!rooms[roomCode]) return;
 
-    console.log(`${playerName} requested to restart the game in room ${roomCode}`);
-
     // Reset player scores
     for (const playerId in rooms[roomCode].players) {
         rooms[roomCode].players[playerId].score = 0;
@@ -231,7 +229,6 @@ function handlePlayerQuit(roomCode, socketId, playerName) {
         }
         // Stop resource spawning using the exported function
         resourceController.stopResourceSpawning(rooms[roomCode]);
-        console.log(`Moderator ${playerName} requested to quit room ${roomCode}`);
         io.to(roomCode).emit('gameQuit', { message: `${playerName} quit the game. Game ended.` });
         delete rooms[roomCode];
     } else {
@@ -244,7 +241,6 @@ function handlePlayerQuit(roomCode, socketId, playerName) {
 }
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
 
     // CREATE GAME
     socket.on('createGame', (data) => {
@@ -311,7 +307,6 @@ io.on('connection', (socket) => {
     // JOIN GAME STATE (from game.html)
     socket.on('joinGameState', (data) => {
         const { roomCode, playerName } = data;
-        console.log(`joinGameState received from ${playerName} for room ${roomCode}`);
 
         if (!rooms[roomCode]) {
             console.log(`Room ${roomCode} does not exist in joinGameState.`);
@@ -324,8 +319,6 @@ io.on('connection', (socket) => {
         if (!rooms[roomCode].players[socket.id]) {
             rooms[roomCode].players[socket.id] = { name: playerName, score: 0 };
         }
-
-        console.log(`Player ${playerName} joined game state for room ${roomCode}`);
 
         if (rooms[roomCode].inGame && rooms[roomCode].labyrinthLayout.length > 0) {
             socket.emit('labyrinthLayout', rooms[roomCode].labyrinthLayout);
@@ -361,7 +354,6 @@ io.on('connection', (socket) => {
     // In server.js, modify the updateGameMode handler:
     socket.on('updateGameMode', (data) => {
         const { roomCode, gameMode } = data;
-        console.log(`Mode update received for room ${roomCode}: ${gameMode}`);
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -395,7 +387,6 @@ io.on('connection', (socket) => {
 
         rooms[roomCode].settings.NPCOpponents = NPCOpponents;
         rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
-        console.log(`Updated room ${roomCode} NPC settings: ${rooms[roomCode].settings.NPCOpponents} bots at ${rooms[roomCode].settings.NPCDifficulty} difficulty`);
 
         io.to(roomCode).emit('NPCSettingsUpdated', {
             NPCOpponents,
@@ -414,10 +405,7 @@ io.on('connection', (socket) => {
         }
 
         const gameMode = rooms[roomCode].settings.gameMode;
-        console.log(`Starting game in ${gameMode} mode for room ${roomCode}`);
-
         const playerCount = Object.keys(rooms[roomCode].players).length;
-        console.log(`Current player count: ${playerCount}`);
 
         // Validate player requirements for multiplayer mode
         if (gameMode === 'Multiplayer' && playerCount < 2) {
@@ -429,14 +417,10 @@ io.on('connection', (socket) => {
         if (gameMode === 'SinglePlayer') {
             const NPCOpponents = parseInt(rooms[roomCode].settings.NPCOpponents) || 1;
             const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty || 'Medium';
-            console.log(`Creating ${NPCOpponents} NPCs with difficulty ${NPCDifficulty}`);
 
             try {
                 rooms[roomCode] = NPCController.createNPCPlayers(rooms[roomCode], NPCOpponents, NPCDifficulty);
-                console.log(`NPCs created. Total players now: ${Object.keys(rooms[roomCode].players).length}`);
-                console.log(`NPC IDs: ${Object.keys(rooms[roomCode].NPCPlayers || {}).join(', ')}`);
             } catch (error) {
-                console.error("Error creating NPCs:", error);
             }
 
             io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
@@ -479,7 +463,6 @@ io.on('connection', (socket) => {
 
             if (Object.keys(rooms[roomCode].players).length === 0) {
                 delete rooms[roomCode];
-                console.log(`Room ${roomCode} deleted due to no players.`);
             }
         }
     });
@@ -487,7 +470,6 @@ io.on('connection', (socket) => {
     // UPDATE GAME SETTINGS
     socket.on('updateGameSettings', (data) => {
         const { roomCode, settings } = data;
-        console.log(`Game settings update for room ${roomCode}:`, settings);
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -505,13 +487,10 @@ io.on('connection', (socket) => {
         const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty;
 
         rooms[roomCode].settings = settings;
-
-        // Restore the gameMode and NPC settings
         rooms[roomCode].settings.gameMode = gameMode;
         rooms[roomCode].settings.NPCOpponents = NPCOpponents;
         rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
 
-        console.log(`Updated room ${roomCode} settings. Game mode is still: ${rooms[roomCode].settings.gameMode}`);
         io.to(roomCode).emit('settingsUpdated', settings);
     });
 
@@ -557,7 +536,6 @@ io.on('connection', (socket) => {
     // GAME ACTION (pause, resume, restart, quit)
     socket.on('gameAction', (data) => {
         const { roomCode, action, playerName } = data;
-        console.log(`Server received gameAction: ${action} from ${playerName} for room ${roomCode}`);
 
         if (!rooms[roomCode]) return;
 
@@ -587,14 +565,12 @@ io.on('connection', (socket) => {
                 break;
 
             default:
-                console.log(`Unknown game action: ${action}`);
                 break;
         }
     });
 
     // DISCONNECT handler
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
 
         for (const roomCode in rooms) {
             if (rooms[roomCode].players[socket.id]) {
@@ -606,7 +582,6 @@ io.on('connection', (socket) => {
                     // If this was the last player in a room, ensure resources are properly stopped
                     resourceController.stopResourceSpawning(rooms[roomCode]);
                     delete rooms[roomCode];
-                    console.log(`Room ${roomCode} deleted due to inactivity.`);
                 }
             }
         }
