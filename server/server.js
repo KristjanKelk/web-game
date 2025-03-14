@@ -407,24 +407,49 @@ io.on('connection', (socket) => {
         const gameMode = rooms[roomCode].settings.gameMode;
         const playerCount = Object.keys(rooms[roomCode].players).length;
 
-        // Validate player requirements for multiplayer mode
-        if (gameMode === 'Multiplayer' && playerCount < 2) {
-            socket.emit('startError', 'At least 2 players are required to start a multiplayer game.');
-            return;
-        }
+        // Validate game mode requirements
+        if (gameMode === 'Multiplayer') {
+            if (playerCount < 2) {
+                socket.emit('startError', 'At least 2 players are required to start a multiplayer game.');
+                return;
+            }
 
-        // Setup NPC players for single-player mode
-        if (gameMode === 'SinglePlayer') {
+            // Clear any existing NPC players if switching from SinglePlayer to Multiplayer
+            if (rooms[roomCode].NPCPlayers) {
+                // Remove any NPCs from the players list
+                for (const NPCId in rooms[roomCode].NPCPlayers) {
+                    if (rooms[roomCode].players[NPCId]) {
+                        delete rooms[roomCode].players[NPCId];
+                    }
+                    if (rooms[roomCode].positions && rooms[roomCode].positions[NPCId]) {
+                        delete rooms[roomCode].positions[NPCId];
+                    }
+                }
+                rooms[roomCode].NPCPlayers = {};
+            }
+        } else if (gameMode === 'SinglePlayer') {
+            const multiPlayers = Object.keys(rooms[roomCode].players).filter(
+                id => !id.startsWith('NPC-')
+            );
+
+            if (multiPlayers.length > 1) {
+                socket.emit('startError', 'Single Player mode is only available for 1 human player. Please switch to Multiplayer mode or ask other players to leave.');
+                return;
+            }
+
+            // Setup NPC players for single-player mode
             const NPCOpponents = parseInt(rooms[roomCode].settings.NPCOpponents) || 1;
             const NPCDifficulty = rooms[roomCode].settings.NPCDifficulty || 'Medium';
 
             try {
                 rooms[roomCode] = NPCController.createNPCPlayers(rooms[roomCode], NPCOpponents, NPCDifficulty);
             } catch (error) {
+                console.error("Error creating NPC players:", error);
             }
-
-            io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
         }
+
+        // Update player list to reflect any changes
+        io.to(roomCode).emit('updatePlayerList', Object.values(rooms[roomCode].players));
 
         // Generate and set labyrinth layout
         const difficulty = (rooms[roomCode].settings.difficulty || 'Easy').toLowerCase();

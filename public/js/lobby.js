@@ -154,9 +154,40 @@ function updatePreviewBots() {
     updatePlayerListDisplay();
 }
 
+function validateGameMode(mode) {
+    debug(`Validating game mode ${mode} with ${realPlayers.length} real players`);
+
+    if (mode === 'SinglePlayer' && realPlayers.length > 1) {
+        if (lobbyErrorMsg) {
+            lobbyErrorMsg.textContent = 'Single Player mode is only available when there is exactly 1 human player.';
+            lobbyErrorMsg.style.display = 'block';
+
+            // Automatically switch back to multiplayer
+            setTimeout(() => {
+                switchGameMode('Multiplayer');
+                if (lobbyErrorMsg) {
+                    lobbyErrorMsg.textContent = '';
+                    lobbyErrorMsg.style.display = 'none';
+                }
+            }, 3000);
+        }
+        return false;
+    }
+
+    if (lobbyErrorMsg) {
+        lobbyErrorMsg.textContent = '';
+        lobbyErrorMsg.style.display = 'none';
+    }
+    return true;
+}
+
 // Function to switch game mode
 function switchGameMode(mode) {
-    debug(`Switching game mode to: ${mode}`);
+
+    if (!validateGameMode(mode)) {
+        return;
+    }
+
     currentGameMode = mode;
 
     // Show appropriate settings
@@ -287,22 +318,36 @@ socket.on('updatePlayerList', (players) => {
         startButton.style.display = amIModerator ? 'inline-block' : 'none';
     }
 
-    // Make sure current game mode is properly reflected in UI
-    if (amIModerator) {
-        if (gameSettingsPanel) {
-            gameSettingsPanel.className = currentGameMode === 'Multiplayer' ?
-                'multiplayer-active' : 'singleplayer-active';
-        }
+    // If in SinglePlayer mode but multiple humans joined, auto-switch to Multiplayer
+    if (currentGameMode === 'SinglePlayer' && players.filter(p => !p.isNPC).length > 1 && amIModerator) {
+        debug("Multiple human players detected while in SinglePlayer mode - switching to Multiplayer");
+        switchGameMode('Multiplayer');
 
-        if (multiplayerBtn && singlePlayerBtn) {
-            multiplayerBtn.classList.toggle('active', currentGameMode === 'Multiplayer');
-            singlePlayerBtn.classList.toggle('active', currentGameMode === 'SinglePlayer');
-        }
+        // Show a notification
+        if (lobbyErrorMsg) {
+            lobbyErrorMsg.textContent = 'Switched to Multiplayer mode because multiple human players are present.';
+            lobbyErrorMsg.style.display = 'block';
 
-        // If in SinglePlayer mode, ensure preview bots are shown
-        if (currentGameMode === 'SinglePlayer') {
-            debug("Currently in SinglePlayer mode as moderator, updating preview bots");
-            updatePreviewBots();
+            setTimeout(() => {
+                lobbyErrorMsg.textContent = '';
+                lobbyErrorMsg.style.display = 'none';
+            }, 5000);
+        }
+    } else {
+        if (amIModerator) {
+            if (gameSettingsPanel) {
+                gameSettingsPanel.className = currentGameMode === 'Multiplayer' ?
+                    'multiplayer-active' : 'singleplayer-active';
+            }
+
+            if (multiplayerBtn && singlePlayerBtn) {
+                multiplayerBtn.classList.toggle('active', currentGameMode === 'Multiplayer');
+                singlePlayerBtn.classList.toggle('active', currentGameMode === 'SinglePlayer');
+            }
+
+            if (currentGameMode === 'SinglePlayer') {
+                updatePreviewBots();
+            }
         }
     }
 
@@ -362,8 +407,15 @@ socket.on('gameModeUpdated', (data) => {
         if (data.gameMode === 'SinglePlayer') {
             startButton.textContent = 'Start Single-Player Game';
             startButton.className = 'action-btn single-player-btn';
-            startButton.disabled = false;
-            startButton.classList.remove('disabled-btn');
+
+            // Disable the button if there are multiple human players
+            if (realPlayers.filter(p => !p.isNPC).length > 1) {
+                startButton.disabled = true;
+                startButton.classList.add('disabled-btn');
+            } else {
+                startButton.disabled = false;
+                startButton.classList.remove('disabled-btn');
+            }
 
             // Create preview bots when switching to SinglePlayer
             debug("Switching to SinglePlayer mode, updating preview bots");
@@ -372,14 +424,9 @@ socket.on('gameModeUpdated', (data) => {
             startButton.textContent = 'Start Multiplayer Game';
             startButton.className = 'action-btn multi-player-btn';
             updateStartButtonState();
-
-            // Clear preview bots in multiplayer mode
             previewBots = [];
-            debug("Switching to Multiplayer mode, cleared preview bots");
         }
     }
-
-    // Update player list display
     updatePlayerListDisplay();
 });
 
@@ -405,7 +452,6 @@ socket.on('NPCSettingsUpdated', (settings) => {
 
     // Update preview bots if in single player mode
     if (currentGameMode === 'SinglePlayer') {
-        debug("NPC settings updated, refreshing preview bots");
         updatePreviewBots();
     }
 });
@@ -413,20 +459,32 @@ socket.on('NPCSettingsUpdated', (settings) => {
 // Event listeners for mode buttons
 if (multiplayerBtn) {
     multiplayerBtn.addEventListener('click', () => {
-        debug("Multiplayer button clicked");
         if (amIModerator) {
             switchGameMode('Multiplayer');
-        } else {
-            debug("Not moderator, can't switch mode");
         }
     });
 }
 
 if (singlePlayerBtn) {
     singlePlayerBtn.addEventListener('click', () => {
-        debug("SinglePlayer button clicked");
         if (amIModerator) {
-            switchGameMode('SinglePlayer');
+            // Check if we have more than one human player
+            const humanPlayerCount = realPlayers.filter(p => !p.isNPC).length;
+
+            if (humanPlayerCount > 1) {
+                // Don't allow switching to single player with multiple humans
+                if (lobbyErrorMsg) {
+                    lobbyErrorMsg.textContent = 'Single Player mode requires exactly 1 human player. Please ask other players to leave first.';
+                    lobbyErrorMsg.style.display = 'block';
+
+                    setTimeout(() => {
+                        lobbyErrorMsg.textContent = '';
+                        lobbyErrorMsg.style.display = 'none';
+                    }, 5000);
+                }
+            } else {
+                switchGameMode('SinglePlayer');
+            }
         } else {
             debug("Not moderator, can't switch mode");
         }
@@ -436,16 +494,13 @@ if (singlePlayerBtn) {
 // Save settings (only used for multiplayer difficulty now)
 if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', () => {
-        debug("Save settings button clicked");
         if (amIModerator && difficultySelect) {
             const settings = {
                 roomCode,
                 settings: { difficulty: difficultySelect.value }
             };
-            debug(`Sending settings update: ${JSON.stringify(settings)}`);
             socket.emit('updateGameSettings', settings);
         } else {
-            debug("Not sending settings: not moderator or difficultySelect missing");
         }
     });
 }
@@ -520,9 +575,6 @@ if (leaveLobbyButton) {
     });
 }
 
-// Optional: Force create some bots for testing
-// Uncomment this line to test if bots can appear at all
-// setTimeout(forceBotCreation, 2000);
 
 // Debug when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
