@@ -16,7 +16,7 @@ function generateLabyrinth(difficulty) {
     const cellWidth = boardWidth / cols;
     const cellHeight = boardHeight / rows;
 
-    let wallProbability = difficulty === 'hard' ? 0.35 : 0.2;
+    let wallProbability = difficulty === 'hard' ? 0.25 : 0.1;
 
     const walls = [];
     const centerCol = Math.floor(cols / 2);

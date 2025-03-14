@@ -31,11 +31,11 @@ function createNPCPlayers(room, numOpponents, difficulty) {
     }
 
     // Determine NPC speed based on difficulty
-    let NPCSpeed = 6;
+    let NPCSpeed = 7;
     if (difficulty === 'Easy') {
         NPCSpeed = 5;
     } else if (difficulty === 'Hard') {
-        NPCSpeed = 9;
+        NPCSpeed = 10;
     }
 
     // Create the specified number of NPC players
@@ -194,10 +194,8 @@ function moveTowardTarget(room, NPC) {
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     // If we're very close to target, consider it reached
-    if (distance < 5) {
+    if (distance < 4) {
         if (NPC.target.id !== 'random') {
-            // Target was a resource but we've reached it
-            // We'll pick a new target on next update
             NPC.target = null;
         }
         return;
@@ -260,17 +258,17 @@ function checkResourceCollection(room, NPC, resourceCollectionCallback) {
 
     const NPCRect = {
         left: NPC.position.x,
-        right: NPC.position.x + 40, // Assuming width of 40
+        right: NPC.position.x + 40,
         top: NPC.position.y,
-        bottom: NPC.position.y + 40 // Assuming height of 40
+        bottom: NPC.position.y + 40
     };
 
     for (const resource of room.resources) {
         const resourceRect = {
             left: resource.left,
-            right: resource.left + 20, // Assuming width of 20
+            right: resource.left + 20,
             top: resource.top,
-            bottom: resource.top + 20 // Assuming height of 20
+            bottom: resource.top + 20
         };
 
         // Check for collision
