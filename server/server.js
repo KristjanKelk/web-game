@@ -327,9 +327,9 @@ io.on('connection', (socket) => {
         updateAndBroadcastScores(roomCode);
     });
 
-    // Handle NPC Settings update
     socket.on('updateNPCSettings', (data) => {
-        const { roomCode, NPCOpponents, NPCDifficulty } = data;
+        const { roomCode, NPCOpponents, NPCSettings } = data;
+        console.log(`NPC settings update for room ${roomCode}: ${NPCOpponents} bots with individual settings`);
 
         if (!rooms[roomCode]) {
             socket.emit('settingsError', 'Room does not exist.');
@@ -342,11 +342,11 @@ io.on('connection', (socket) => {
         }
 
         rooms[roomCode].settings.NPCOpponents = NPCOpponents;
-        rooms[roomCode].settings.NPCDifficulty = NPCDifficulty;
+        rooms[roomCode].settings.NPCSettings = NPCSettings || [];
 
         io.to(roomCode).emit('NPCSettingsUpdated', {
             NPCOpponents,
-            NPCDifficulty
+            NPCSettings: rooms[roomCode].settings.NPCSettings
         });
     });
 

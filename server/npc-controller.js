@@ -11,9 +11,10 @@ const labyrinthGenerator = require('./labyrinthGenerator');
  * @param {string} difficulty - NPC difficulty level (Easy, Medium, Hard)
  * @returns {Object} Updated room object with NPC players
  */
-function createNPCPlayers(room, numOpponents, difficulty) {
-    if (!room) return room;
 
+// Modify the createNPCPlayers function in npc-controller.js
+function createNPCPlayers(room, numOpponents, NPCSettings = []) {
+    if (!room) return room;
 
     if (!room.NPCPlayers) {
         room.NPCPlayers = {};
@@ -30,22 +31,28 @@ function createNPCPlayers(room, numOpponents, difficulty) {
         }
     }
 
-    // Determine NPC speed based on difficulty
-    let NPCSpeed = 7;
-    if (difficulty === 'Easy') {
-        NPCSpeed = 5;
-    } else if (difficulty === 'Hard') {
-        NPCSpeed = 10;
-    }
-
     // Create the specified number of NPC players
     for (let i = 0; i < numOpponents; i++) {
         const NPCId = `NPC-${i}-${Date.now()}`;
         const NPCNumber = i + 1; // 1-based NPC numbering
         const NPCName = `NPC-${NPCNumber}`;
 
-        // Generate different starting positions based on NPC number
-        // to avoid NPC players stacking on top of each other
+        // Get individual difficulty for this NPC if available
+        let npcDifficulty = 'Medium'; // Default
+        const npcSetting = NPCSettings.find(npc => npc.number === NPCNumber);
+        if (npcSetting && npcSetting.difficulty) {
+            npcDifficulty = npcSetting.difficulty;
+        }
+
+        // Determine NPC speed based on difficulty
+        let NPCSpeed = 7; // Medium
+        if (npcDifficulty === 'Easy') {
+            NPCSpeed = 5;
+        } else if (npcDifficulty === 'Hard') {
+            NPCSpeed = 10;
+        }
+
+        // Generate different starting positions
         const posX = Math.random() * 500 + 250 + (NPCNumber * 50);
         const posY = Math.random() * 400 + 200 + (NPCNumber * 50);
 
@@ -67,7 +74,7 @@ function createNPCPlayers(room, numOpponents, difficulty) {
             target: null,
             lastTargetUpdate: Date.now(),
             speed: NPCSpeed,
-            difficulty
+            difficulty: npcDifficulty
         };
 
         // Add to positions for rendering

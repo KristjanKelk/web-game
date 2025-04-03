@@ -125,7 +125,6 @@ function updatePlayerListDisplay() {
     }
 }
 
-// Function to create preview NPC bots based on settings
 function updatePreviewBots() {
     if (!NPCOpponentsSelect) {
         debug("NPCOpponentsSelect element not found!");
@@ -133,25 +132,29 @@ function updatePreviewBots() {
     }
 
     const botCount = parseInt(NPCOpponentsSelect.value);
-    const difficulty = NPCDifficultySelect ? NPCDifficultySelect.value : 'Medium';
 
-    debug(`Creating ${botCount} preview bots with difficulty ${difficulty}`);
+    debug(`Creating ${botCount} preview bots with individual difficulties`);
 
     // Create preview bots array
     previewBots = [];
-    for (let i = 0; i < botCount; i++) {
+    for (let i = 1; i <= botCount; i++) {
+        // Get individual difficulty for this NPC
+        const difficultySelect = document.getElementById(`NPC${i}DifficultySelect`);
+        const difficulty = difficultySelect ? difficultySelect.value : 'Medium';
+
         previewBots.push({
-            name: `NPC-${i+1}`,
+            name: `NPC-${i}`,
             isNPC: true,
             difficulty: difficulty,
             isPreview: true
         });
-    }
 
-    debug(`Created ${previewBots.length} preview bots`);
+        debug(`Created preview bot NPC-${i} with difficulty ${difficulty}`);
+    }
 
     // Update the display
     updatePlayerListDisplay();
+    updateNPCSettingsDisplay();
 }
 
 function validateGameMode(mode) {
@@ -264,6 +267,66 @@ function switchGameMode(mode) {
             settings: { difficulty: 'Easy' }
         });
     }
+}
+
+// Function to update individual NPC settings visibility based on number of NPCs
+function updateIndividualNPCSettings() {
+    debug("Updating individual NPC settings");
+    const numNPCs = parseInt(NPCOpponentsSelect.value);
+
+    // Hide all NPC settings first
+    document.querySelectorAll('.npc-settings').forEach(el => {
+        el.style.display = 'none';
+    });
+
+    // Show settings for the selected number of NPCs
+    for (let i = 1; i <= numNPCs; i++) {
+        const npcSettings = document.getElementById(`npc${i}Settings`);
+        if (npcSettings) {
+            npcSettings.style.display = 'block';
+        }
+    }
+
+    // Update preview bots with individual difficulties
+    updatePreviewBots();
+}
+
+// Function to update NPC settings display
+function updateNPCSettingsDisplay() {
+    const displayContainer = document.getElementById('displayIndividualNPCSettings');
+    if (!displayContainer) return;
+
+    // Clear previous display
+    displayContainer.innerHTML = '';
+
+    // Add display for each NPC
+    previewBots.forEach(bot => {
+        const npcDisplay = document.createElement('div');
+        npcDisplay.className = 'setting-display';
+        npcDisplay.innerHTML = `
+            <span class="setting-label">${bot.name} Difficulty:</span>
+            <span class="setting-value">${bot.difficulty}</span>
+        `;
+        displayContainer.appendChild(npcDisplay);
+    });
+}
+
+// Function to get all individual NPC settings as an array
+function getNPCSettingsArray() {
+    const npcs = [];
+    const botCount = parseInt(NPCOpponentsSelect.value);
+
+    for (let i = 1; i <= botCount; i++) {
+        const difficultySelect = document.getElementById(`NPC${i}DifficultySelect`);
+        const difficulty = difficultySelect ? difficultySelect.value : 'Medium';
+
+        npcs.push({
+            number: i,
+            difficulty: difficulty
+        });
+    }
+
+    return npcs;
 }
 
 // Update start button state for multiplayer
@@ -437,22 +500,24 @@ socket.on('NPCSettingsUpdated', (settings) => {
         displayNPCOpponents.textContent = settings.NPCOpponents;
     }
 
-    if (displayNPCDifficulty) {
-        displayNPCDifficulty.textContent = settings.NPCDifficulty;
-    }
-
     // Update form values
     if (NPCOpponentsSelect) {
-        NPCOpponentsSelect.value = settings.NPCOpponents;
+        updateIndividualNPCSettings();
     }
 
-    if (NPCDifficultySelect) {
-        NPCDifficultySelect.value = settings.NPCDifficulty;
+    // Update individual NPC settings
+    if (settings.NPCSettings) {
+        settings.NPCSettings.forEach(npc => {
+            const difficultySelect = document.getElementById(`NPC${npc.number}DifficultySelect`);
+            if (difficultySelect) {
+                difficultySelect.value = npc.difficulty;
+            }
+        });
     }
 
     // Update preview bots if in single player mode
     if (currentGameMode === 'SinglePlayer') {
-        updatePreviewBots();
+        updateIndividualNPCSettings();
     }
 });
 
@@ -510,17 +575,16 @@ if (NPCOpponentsSelect) {
     NPCOpponentsSelect.addEventListener('change', () => {
         debug(`NPCOpponentsSelect changed to ${NPCOpponentsSelect.value}`);
         if (amIModerator && currentGameMode === 'SinglePlayer') {
+            updateIndividualNPCSettings();
+
             const settings = {
                 roomCode,
                 NPCOpponents: NPCOpponentsSelect.value,
-                NPCDifficulty: NPCDifficultySelect ? NPCDifficultySelect.value : 'Medium'
+                NPCSettings: getNPCSettingsArray()
             };
+
             debug(`Sending NPC settings update: ${JSON.stringify(settings)}`);
             socket.emit('updateNPCSettings', settings);
-
-            // Update preview bots
-            debug("Updating preview bots after opponents change");
-            updatePreviewBots();
         } else {
             debug("Not sending NPC settings: not moderator or not in SinglePlayer mode");
         }
@@ -585,4 +649,26 @@ document.addEventListener('DOMContentLoaded', () => {
     - singlePlayerBtn: ${singlePlayerBtn ? 'Found' : 'Not found'}
     - gameSettingsPanel: ${gameSettingsPanel ? 'Found' : 'Not found'}
     `);
+});
+
+// Add event listeners for individual NPC difficulty selects
+document.querySelectorAll('.npcDifficultySelect').forEach(select => {
+    select.addEventListener('change', () => {
+        if (amIModerator && currentGameMode === 'SinglePlayer') {
+            const npcNumber = select.getAttribute('data-npc-number');
+            debug(`NPC${npcNumber}DifficultySelect changed to ${select.value}`);
+
+            const settings = {
+                roomCode,
+                NPCOpponents: NPCOpponentsSelect ? NPCOpponentsSelect.value : '1',
+                NPCSettings: getNPCSettingsArray()
+            };
+
+            debug(`Sending NPC settings update: ${JSON.stringify(settings)}`);
+            socket.emit('updateNPCSettings', settings);
+
+            // Update preview bots
+            updatePreviewBots();
+        }
+    });
 });
